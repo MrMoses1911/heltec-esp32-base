@@ -1,0 +1,55 @@
+description: "Arduino core for ESP32, ESP32-C, ESP32-H, ESP32-P, ESP32-S series of SoCs"
+url: "https://github.com/espressif/arduino-esp32"
+license: "LGPL-2.1"
+targets:
+  - esp32
+  - esp32c2
+  - esp32c3
+  - esp32c5
+  - esp32c6
+  - esp32c61
+  - esp32h2
+  - esp32p4
+  - esp32s2
+  - esp32s3
+tags:
+  - arduino
+files:
+  include:
+    - "variants/esp32/**/*"
+    - "variants/esp32c2/**/*"
+    - "variants/esp32c3/**/*"
+    - "variants/esp32c5/**/*"
+    - "variants/esp32c6/**/*"
+    - "variants/esp32c61/**/*"
+    - "variants/esp32h2/**/*"
+    - "variants/esp32p4/**/*"
+    - "variants/esp32s2/**/*"
+    - "variants/esp32s3/**/*"
+  exclude:
+    - ".*" # All files in the root directory that start with a dot.
+    - ".gitlab/"
+    - ".gitlab/**/*"
+    - "docs/"
+    - "docs/**/*"
+    - "idf_component_examples/"
+    - "idf_component_examples/**/*"
+    - "package/"
+    - "package/**/*"
+    - "tests/"
+    - "tests/**/*"
+    - "tools/"
+    - "tools/**/*"
+    - "variants/**/*"
+    - "boards.txt"
+    - "CODE_OF_CONDUCT.md"
+    - "LICENSE.md"
+    - "package.json"
+    - "platform.txt"
+    - "programmers.txt"
+dependencies:
+  idf: ">=5.3,<5.6"
+examples:
+  - path: ./idf_component_examples/Arduino_ESP_Matter_over_OpenThread
+  - path: ./idf_component_examples/hello_world
+  - path: ./idf_component_examples/hw_cdc_hello_world

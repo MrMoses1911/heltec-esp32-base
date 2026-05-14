@@ -1,7 +1,6 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
   "idf.extensionActivationMode": "always",
-  "idf.currentSetup": "C:\\esp\\v5.5.3\\esp-idf",
   "idf.flashType": "UART",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
