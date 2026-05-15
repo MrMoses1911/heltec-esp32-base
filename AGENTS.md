@@ -59,6 +59,35 @@ main/
   platform/
     platform_bootstrap.h      # Board abstraction header
     platform_bootstrap.cpp    # Heltec init, OLED, button, radio wrappers
+  sensors/
+    q5x_pfm_channel8.h        # Banner Q5X laser sensor — PFM via PCNT
+    q5x_pfm_channel8.cpp
+```
+
+## PFM sensor — Q5X_PFM_Channel8
+
+Reads a Banner Q5X 5000 mm laser sensor via PFM (Pulse Frequency Modulation) on GPIO 38 (CH8).
+
+Uses the ESP32 **PCNT** peripheral — hardware pulse counting, non-blocking. Sampled every 200 ms via `millis()` in the loop. Add `esp_driver_pcnt` to `REQUIRES` in `main/CMakeLists.txt` when adding to a new project.
+
+| Parameter | Value |
+|---|---|
+| GPIO | 38 (hardware channel 8) |
+| PCNT edge | Rising only (INCREASE / HOLD) |
+| Glitch filter | 1 µs |
+| Sample window | 200 ms |
+| 100 Hz → 50 mm (near limit) |
+| 600 Hz → 5000 mm (far limit) |
+| ~50 Hz → Loss Of Signal |
+| Filter | EMA (α=0.3) |
+
+```cpp
+Q5X_PFM_Channel8 ch8;
+ch8.init();            // GPIO 38, 200 ms
+ch8.update();          // call every loop iteration
+ch8.getFrequencyHz();
+ch8.getFilteredDistanceMm();
+ch8.getStatus();       // kOk / kNoTarget / kInvalidSignal / kNotInitialized
 ```
 
 ## Platform abstraction
