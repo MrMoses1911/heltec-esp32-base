@@ -20,36 +20,36 @@ public:
   uint32_t getRejected() const;
   Status getStatus() const;
 
-  static constexpr float kMinFreqHz = 90.0f;
-  static constexpr float kMaxFreqHz = 660.0f;
+  static constexpr float kMinFreqHz = 100.0f;
+  static constexpr float kMaxFreqHz = 600.0f;
+  static constexpr float kMinDistMm = 50.0f;
+  static constexpr float kMaxDistMm = 5000.0f;
 
 private:
   static constexpr uint32_t kNoSignalGapUs = 300000;
   static constexpr uint8_t kBufSize = 7;
-  static constexpr float kMaxDeltaMm = 5.0f;
-  static constexpr uint8_t kSpikeThreshold = 10;
+  static constexpr float kEmaAlpha = 0.20f;
 
   static void isrHandler(void *arg);
   uint32_t medianPeriod();
 
-  int m_gpio;
-  bool m_initialized;
+  int m_gpio = 38;
+  bool m_initialized = false;
 
-  float m_frequencyHz;
-  float m_distanceMm;
-  float m_lastAcceptedMm;
-  uint8_t m_spikeCount;
-  Status m_status;
+  float m_frequencyHz = 0.0f;
+  float m_distanceMm = 0.0f;
+  float m_emaDistanceMm = 0.0f;
+  Status m_status = kNotInitialized;
 
-  volatile uint32_t m_isrLastEdgeUs;
-  volatile uint32_t m_isrBuf[kBufSize];
-  volatile uint8_t m_isrIdx;
-  volatile bool m_isrNewData;
-  volatile uint32_t m_isrLastValidUs;
-  volatile uint32_t m_isrRejected;
-  volatile uint32_t m_isrValidPulses;
+  uint32_t m_readPeriodUs = 0;
 
-  uint32_t m_readPeriodUs;
+  volatile uint32_t m_isrLastEdgeUs = 0;
+  volatile uint32_t m_isrBuf[kBufSize] = {};
+  volatile uint8_t m_isrIdx = 0;
+  volatile bool m_isrNewData = false;
+  volatile uint32_t m_isrLastValidUs = 0;
+  volatile uint32_t m_isrRejected = 0;
+  volatile uint32_t m_isrValidPulses = 0;
 };
 
 #endif

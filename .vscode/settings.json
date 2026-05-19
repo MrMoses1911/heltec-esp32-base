@@ -12,7 +12,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=c:\\esp\\Projetos\\heltec-esp32-base\\build"
+    "--compile-commands-dir=c:\\esp\\Projetos\\Pulse_SafeDock\\build"
   ],
   "idf.currentSetup": "C:\\esp\\v5.5.3\\esp-idf",
   "idf.portWin": "COM8"

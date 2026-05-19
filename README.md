@@ -1,4 +1,4 @@
-# heltec-esp32-base
+# Pulse SafeDock
 
 Template limpo para projetos com **Heltec WiFi LoRa V3** (ESP32-S3 + SX1262) no **ESP-IDF 5.5.3** com framework **Arduino**.
 
