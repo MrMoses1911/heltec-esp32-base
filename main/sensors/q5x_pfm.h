@@ -2,6 +2,8 @@
 #define Q5X_PFM_H
 
 #include <cstdint>
+#include "driver/pulse_cnt.h"
+#include "esp_timer.h"
 
 class Q5X_PFM {
 public:
@@ -27,14 +29,11 @@ public:
 
 private:
   static constexpr uint32_t kNoSignalGapUs = 300000;
-  static constexpr uint8_t kBufSize = 16;
-  static constexpr float kEmaAlpha = 0.12f;
-  static constexpr float kMadReject = 3.0f;
+  static constexpr uint32_t kSampleIntervalMs = 80;
+  static constexpr float kEmaAlpha = 0.35f;
 
-  static void isrHandler(void *arg);
-  uint32_t medianPeriod();
+  static void timerCallback(void* arg);
 
-  int m_gpio = 38;
   bool m_initialized = false;
 
   float m_frequencyHz = 0.0f;
@@ -42,16 +41,12 @@ private:
   float m_emaDistanceMm = 0.0f;
   Status m_status = kNotInitialized;
 
-  uint32_t m_readPeriodUs = 0;
+  pcnt_unit_handle_t m_pcntUnit = nullptr;
+  esp_timer_handle_t m_timer = nullptr;
 
-  volatile uint32_t m_isrLastEdgeUs = 0;
-  volatile uint32_t m_isrBuf[kBufSize] = {};
-  volatile uint8_t m_isrIdx = 0;
-  volatile uint8_t m_isrCount = 0;
-  volatile bool m_isrNewData = false;
-  volatile uint32_t m_isrLastValidUs = 0;
-  volatile uint32_t m_isrRejected = 0;
-  volatile uint32_t m_isrValidPulses = 0;
+  int m_lastCount = 0;
+  uint32_t m_readPeriodUs = 0;
+  uint32_t m_isrRejected = 0;
 };
 
 #endif
