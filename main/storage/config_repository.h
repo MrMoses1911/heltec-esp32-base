@@ -11,11 +11,12 @@ namespace storage {
 
 struct SafeDockConfig {
   uint16_t schemaVersion = 1;
-  uint16_t freqMinHz = 90;
-  uint16_t freqMaxHz = 660;
-  uint16_t distanceMinMm = 40;
-  uint16_t distanceMaxMm = 2200;
+  uint16_t freqMinHz = 100;
+  uint16_t freqMaxHz = 600;
+  uint16_t distanceMinMm = 50;
+  uint16_t distanceMaxMm = 5000;
   uint16_t sensorGpio = 38;
+  uint16_t apSsidCode = 0;
   char webUsername[16] = {'a', 'd', 'm', 'i', 'n', '\0'};
   char webPassword[16] = {'p', 'u', 'l', 's', 'e', '\0'};
   char apSsid[33] = {};
@@ -30,6 +31,8 @@ class ConfigRepository {
 
   esp_err_t Load(SafeDockConfig* config);
   esp_err_t Save(const SafeDockConfig& config);
+  esp_err_t SaveSsidCode(uint16_t code);
+  esp_err_t LoadSsidCode(uint16_t* code);
   esp_err_t FactoryReset();
 
  private:

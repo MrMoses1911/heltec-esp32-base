@@ -5,6 +5,10 @@
 #define PULSE_FEATURE_IO_MIRROR_REMOTE_DO_PLUS 0
 #endif
 
+#ifndef PULSE_FEATURE_SENSOR_FILTER
+#define PULSE_FEATURE_SENSOR_FILTER 1
+#endif
+
 #ifndef PULSE_FEATURE_OTA_RELEASE_POLICY_STRICT
 #define PULSE_FEATURE_OTA_RELEASE_POLICY_STRICT 0
 #endif
@@ -40,6 +44,7 @@ namespace shared {
 
 inline constexpr bool kFeatureIoMirrorRemoteDoPlus = PULSE_FEATURE_IO_MIRROR_REMOTE_DO_PLUS != 0;
 inline constexpr bool kFeatureOtaReleasePolicyStrict = PULSE_FEATURE_OTA_RELEASE_POLICY_STRICT != 0;
+inline constexpr bool kFeatureSensorFilter = PULSE_FEATURE_SENSOR_FILTER != 0;
 inline constexpr const char* kFirmwareVersionValue = PULSE_FW_VERSION_VALUE;
 inline constexpr const char* kFirmwareVersionLabel = PULSE_FW_VERSION_LABEL;
 

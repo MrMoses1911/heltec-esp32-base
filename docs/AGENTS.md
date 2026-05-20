@@ -10,10 +10,28 @@ ESP-IDF 5.5.3 firmware targeting **ESP32-S3** / **Heltec WiFi LoRa V3** (SX1262)
 
 Before any implementation, read these files:
 
-1. **[CHANGELOG.md](./CHANGELOG.md)** — what has already been built and what version we're on
-2. **[docs/TECHNICAL_SPEC.md](./docs/TECHNICAL_SPEC.md)** — full technical specification for recreating the project
-3. **[docs/RECAP.md](./docs/RECAP.md)** — step-by-step recap of every implementation
-4. **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — architecture, namespaces, data flow
+1. **[CHANGELOG.md](../CHANGELOG.md)** — what has already been built and what version we're on
+2. **[TECHNICAL_SPEC.md](./TECHNICAL_SPEC.md)** — full technical specification for recreating the project
+3. **[RECAP.md](./RECAP.md)** — step-by-step recap of every implementation
+4. **[ARCHITECTURE.md](./ARCHITECTURE.md)** — architecture, namespaces, data flow
+
+---
+
+## Workflow rules
+
++ Toda mudança substancial exige **build de teste** antes de reportar conclusão.
++ Build sempre pelo Windows — nunca WSL.
++ Antes de implementar algo novo, leia CHANGELOG.md + TECHINICAL_SPEC.md para evitar duplicação.
++ Nunca apague ou renomeie arquivos sem perguntar ao usuário.
++ **Após cada implementação**:
+   1. Adicione testes unitários em `main/test/` para funcionalidades novas que não dependam de input físico obrigatório
+   2. Atualize `CHANGELOG.md` com a mudança
+   3. Se aplicável, atualize `docs/TECHNICAL_SPEC.md`
++ **Para rodar testes** (com placa conectada via USB):
+   1. Habilitar Unity: adicione `CONFIG_UNITY_ENABLE=y` ao `sdkconfig` (ou via `idf.py menuconfig`)
+   2. Recompile: `idf.py build` (Windows) ou `ninja -C build` (WSL)
+   3. Flash + monitor: `idf.py -p COM8 flash monitor` — os testes rodam automaticamente e mostram PASS/FAIL
+   4. Desabilitar Unity: remova `CONFIG_UNITY_ENABLE=y` do `sdkconfig` para voltar ao firmware normal
 
 ---
 

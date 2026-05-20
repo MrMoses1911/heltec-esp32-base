@@ -20,6 +20,11 @@ enum class Screen : uint8_t {
   kFactoryResetConfirm,
 };
 
+enum class DistanceMode : uint8_t {
+  kFiltered = 0,
+  kRaw = 1,
+};
+
 class MenuManager {
  public:
   MenuManager();
@@ -38,6 +43,8 @@ class MenuManager {
   void ClearFactoryResetConfirmed();
 
   void SetDistanceReading(float mm, float hz, bool valid);
+  DistanceMode GetDistanceMode() const;
+  void ToggleDistanceMode();
 
   struct DistanceData {
     float distanceMm = 0;
@@ -79,6 +86,7 @@ class MenuManager {
   bool factoryResetConfirmed_;
   bool webServerRequested_;
   DistanceData distanceData_;
+  DistanceMode distanceMode_;
   WebServerData webServerData_;
   RuntimeData runtimeData_;
   storage::SafeDockConfig config_;

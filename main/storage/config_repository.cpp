@@ -8,10 +8,10 @@ namespace storage {
 struct PersistedConfig {
   uint32_t magic = 0x53444643;
   uint16_t schemaVersion = 1;
-  uint16_t freqMinHz = 90;
-  uint16_t freqMaxHz = 660;
-  uint16_t distanceMinMm = 40;
-  uint16_t distanceMaxMm = 2200;
+  uint16_t freqMinHz = 100;
+  uint16_t freqMaxHz = 600;
+  uint16_t distanceMinMm = 50;
+  uint16_t distanceMaxMm = 5000;
   uint16_t sensorGpio = 38;
   char webUsername[16] = {'a', 'd', 'm', 'i', 'n', '\0'};
   char webPassword[16] = {'p', 'u', 'l', 's', 'e', '\0'};
@@ -78,6 +78,21 @@ esp_err_t ConfigRepository::Save(const SafeDockConfig& config) {
 
 esp_err_t ConfigRepository::FactoryReset() {
   return store_->EraseAll();
+}
+
+esp_err_t ConfigRepository::SaveSsidCode(uint16_t code) {
+  if (store_ == nullptr) return ESP_ERR_INVALID_STATE;
+  return store_->WriteU16(kNamespace, "ssid_code", code);
+}
+
+esp_err_t ConfigRepository::LoadSsidCode(uint16_t* code) {
+  if (store_ == nullptr || code == nullptr) return ESP_ERR_INVALID_ARG;
+  esp_err_t err = store_->ReadU16(kNamespace, "ssid_code", code);
+  if (err == ESP_ERR_NVS_NOT_FOUND) {
+    *code = 0;
+    return ESP_OK;
+  }
+  return err;
 }
 
 }  // namespace storage

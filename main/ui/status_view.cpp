@@ -61,11 +61,13 @@ void RenderMainMenu(uint8_t selection) {
 }
 
 // ── Distance View ──────────────────────────────────────────
-void RenderDistanceView(float distanceMm, float freqHz, bool valid) {
+void RenderDistanceView(float distanceMm, float freqHz, bool valid, DistanceMode mode) {
   DisplayClear();
   DisplaySetFontNormal();
   DisplayDrawText(0, 0, "Distancia Laser");
-  DisplayDrawText(100, 0, "<OK");
+
+  const char* modeLabel = (mode == DistanceMode::kFiltered) ? "FILT" : "RAW ";
+  DisplayDrawText(90, 0, modeLabel);
 
   if (valid) {
     DisplaySetFontLarge();
@@ -251,7 +253,7 @@ void RenderStatus(const MenuManager& manager) {
       break;
     case Screen::kDistanceView: {
       auto& dd = manager.GetDistanceData();
-      RenderDistanceView(dd.distanceMm, dd.freqHz, dd.valid);
+      RenderDistanceView(dd.distanceMm, dd.freqHz, dd.valid, manager.GetDistanceMode());
       break;
     }
     case Screen::kWebServerConfirm:

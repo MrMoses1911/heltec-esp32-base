@@ -12,7 +12,7 @@ void ShowBootLogo();
 void ShowFatalError(esp_err_t err);
 
 void RenderMainMenu(uint8_t selection);
-void RenderDistanceView(float distanceMm, float freqHz, bool valid);
+void RenderDistanceView(float distanceMm, float freqHz, bool valid, DistanceMode mode);
 void RenderWebServerConfirm(uint8_t selection);
 void RenderWebServerMenu(uint8_t selection);
 void RenderWebMonitor(const MenuManager::WebServerData& data);

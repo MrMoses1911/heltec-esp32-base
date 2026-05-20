@@ -14,6 +14,7 @@
 #include "shared/app_events.h"
 #include "shared/app_types.h"
 #include "shared/io_snapshot.h"
+#include "storage/config_repository.h"
 
 namespace pulse {
 namespace system {
@@ -43,6 +44,11 @@ class NetworkManager {
   void UpdateGroupPairingStatus(const shared::GroupPairingStatus& status);
   void GetCurrentApSsid(char* buffer, size_t bufferSize) const;
   uint32_t GetApAutoStopRemainingSeconds() const;
+  void UpdateSensorData(float distanceMm, float freqHz, bool valid);
+  void UpdateSensorLimits(uint16_t freqMin, uint16_t freqMax, uint16_t distMin, uint16_t distMax);
+  void SetConfigRepository(pulse::storage::ConfigRepository* repo);
+  void SetApSsidCode(uint16_t code);
+  uint16_t GetApSsidCode() const;
 
  private:
   struct NetworkRequest {
@@ -123,6 +129,14 @@ class NetworkManager {
   bool apModeActive_;
   bool stateChangedPending_;
   bool initialized_;
+  float sensorDistanceMm_;
+  float sensorFreqHz_;
+  bool sensorValid_;
+  uint16_t sensorFreqMinHz_;
+  uint16_t sensorFreqMaxHz_;
+  uint16_t sensorDistanceMinMm_;
+  uint16_t sensorDistanceMaxMm_;
+  pulse::storage::ConfigRepository* configRepo_;
 
   static NetworkManager* activeInstance_;
 };

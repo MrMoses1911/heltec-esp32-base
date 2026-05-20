@@ -159,7 +159,15 @@ NetworkManager::NetworkManager()
       wifiStackReady_(false),
       apModeActive_(false),
       stateChangedPending_(false),
-      initialized_(false) {
+      initialized_(false),
+      sensorDistanceMm_(0),
+      sensorFreqHz_(0),
+      sensorValid_(false),
+      sensorFreqMinHz_(100),
+      sensorFreqMaxHz_(600),
+      sensorDistanceMinMm_(50),
+      sensorDistanceMaxMm_(5000),
+      configRepo_(nullptr) {
   activeInstance_ = this;
 }
 
@@ -302,6 +310,31 @@ uint32_t NetworkManager::GetApAutoStopRemainingSeconds() const {
   if (!apActive || alwaysOn || startedUs == 0) return 0;
   const int64_t remainingUs = timeoutUs - (esp_timer_get_time() - startedUs);
   return remainingUs > 0 ? static_cast<uint32_t>(remainingUs / 1000000LL) : 0;
+}
+
+void NetworkManager::UpdateSensorData(float distanceMm, float freqHz, bool valid) {
+  sensorDistanceMm_ = distanceMm;
+  sensorFreqHz_ = freqHz;
+  sensorValid_ = valid;
+}
+
+void NetworkManager::UpdateSensorLimits(uint16_t freqMin, uint16_t freqMax, uint16_t distMin, uint16_t distMax) {
+  sensorFreqMinHz_ = freqMin;
+  sensorFreqMaxHz_ = freqMax;
+  sensorDistanceMinMm_ = distMin;
+  sensorDistanceMaxMm_ = distMax;
+}
+
+void NetworkManager::SetConfigRepository(pulse::storage::ConfigRepository* repo) {
+  configRepo_ = repo;
+}
+
+void NetworkManager::SetApSsidCode(uint16_t code) {
+  apSsidCode_ = code;
+}
+
+uint16_t NetworkManager::GetApSsidCode() const {
+  return apSsidCode_;
 }
 
 void NetworkManager::TaskEntry(void* context) {
@@ -453,14 +486,6 @@ R"html(
           <div class='tile'><span>Uptime</span><strong id='runUptime'>--</strong></div>
         </div>
       </section>
-
-      <section class='card'>
-        <h2 data-text='view.telemetryTitle'>Ambiente</h2>
-        <div class='grid'>
-          <div class='tile'><span data-text='view.telemetryTemperature'>Temperatura local</span><strong id='telemetryTemperature'>--</strong></div>
-          <div class='tile'><span data-text='view.telemetryHumidity'>Umidade local</span><strong id='telemetryHumidity'>--</strong></div>
-        </div>
-      </section>
     </div>
   </div>
 
@@ -479,8 +504,6 @@ R"html(
       const m=Math.floor(s/60),r=s%60
       return m>0?(String(m)+' min '+String(r)+' s'):(String(r)+' s')
     }
-    function formatTemperature(value){return (Number(value||0)/100).toFixed(2)+' C'}
-    function formatHumidity(value){return (Number(value||0)/100).toFixed(2)+' %'}
     function formatUptime(value){const m=Number(value||0);return m>0?(String(Math.floor(m/60))+'h '+String(m%60)+'min'):'--'}
 
     function syncAuthButtons(){
@@ -545,9 +568,6 @@ R"html(
       document.getElementById('runAlias').textContent=String(data.alias||'--')
       document.getElementById('runSoftwareVersion').textContent=String(data.software_version||'--')
       document.getElementById('runUptime').textContent=formatUptime(data.uptime_minutes)
-
-      document.getElementById('telemetryTemperature').textContent=formatTemperature(data.temperature_x100)
-      document.getElementById('telemetryHumidity').textContent=formatHumidity(data.humidity_x100)
     }
 
     async function load(){
@@ -559,7 +579,7 @@ R"html(
 
     if(window.PulseWebUi){window.PulseWebUi.apply()}
     load()
-    setInterval(load,3000)
+    setInterval(load,250)
   </script>
 </body>
 </html>)html";
@@ -654,10 +674,10 @@ R"html(
         </summary>
         <div class='section-body'>
           <div class='grid'>
-            <label><span>Frequencia minima Hz</span><input id='freqMinHz' type='number' min='1' max='10000' value='90'></label>
-            <label><span>Frequencia maxima Hz</span><input id='freqMaxHz' type='number' min='1' max='10000' value='660'></label>
-            <label><span>Distancia minima mm</span><input id='distanceMinMm' type='number' min='1' max='10000' value='40'></label>
-            <label><span>Distancia maxima mm</span><input id='distanceMaxMm' type='number' min='1' max='10000' value='2200'></label>
+            <label><span>Frequencia minima Hz</span><input id='freqMinHz' type='number' min='1' max='10000' value='100'></label>
+            <label><span>Frequencia maxima Hz</span><input id='freqMaxHz' type='number' min='1' max='10000' value='600'></label>
+            <label><span>Distancia minima mm</span><input id='distanceMinMm' type='number' min='1' max='10000' value='50'></label>
+            <label><span>Distancia maxima mm</span><input id='distanceMaxMm' type='number' min='1' max='10000' value='5000'></label>
           </div>
         </div>
       </details>
@@ -827,10 +847,10 @@ R"html(
         latestData=await response.json()
         document.getElementById('wifiSsidSummary').textContent=latestData.configured_ssid||'--'
         document.getElementById('wifiIpSummary').textContent=latestData.configured_ap_ip||'--'
-        document.getElementById('freqMinHz').value=String(latestData.freq_min_hz||90)
-        document.getElementById('freqMaxHz').value=String(latestData.freq_max_hz||660)
-        document.getElementById('distanceMinMm').value=String(latestData.distance_min_mm||40)
-        document.getElementById('distanceMaxMm').value=String(latestData.distance_max_mm||2200)
+        document.getElementById('freqMinHz').value=String(latestData.freq_min_hz||100)
+        document.getElementById('freqMaxHz').value=String(latestData.freq_max_hz||600)
+        document.getElementById('distanceMinMm').value=String(latestData.distance_min_mm||50)
+        document.getElementById('distanceMaxMm').value=String(latestData.distance_max_mm||5000)
         document.getElementById('webAlwaysOn').value=String(latestData.web_server_always_on||0)
         document.getElementById('webTimeoutMinutes').value=String(latestData.web_server_timeout_minutes||15)
         document.getElementById('fixedApSsid').value=latestData.configured_ssid||''
@@ -908,8 +928,6 @@ esp_err_t NetworkManager::StatusHandler(httpd_req_t* request) {
       "\"freq_max_hz\":%u,"
       "\"distance_min_mm\":%u,"
       "\"distance_max_mm\":%u,"
-      "\"temperature_x100\":%d,"
-      "\"humidity_x100\":%u,"
       "\"lora_last_rssi\":%d,"
       "\"lora_last_snr_x100\":%d,"
       "\"lora_rx_packets\":%u,"
@@ -951,18 +969,19 @@ esp_err_t NetworkManager::StatusHandler(httpd_req_t* request) {
       scratch->apIp,
       scratch->configuredSsid,
       scratch->configuredApIp,
-      activeInstance_->configSnapshot_.webServerAlwaysOn,
-      activeInstance_->configSnapshot_.webServerTimeoutMinutes,
-      static_cast<unsigned long>(apAutoStopRemainingSec),
-      0u,
-      0u,
-      "false",
-      90u, 660u, 40u, 2200u,
-      static_cast<int>(activeInstance_->ioSnapshot_.temperatureX100),
-      activeInstance_->ioSnapshot_.humidityX100,
-      static_cast<int>(activeInstance_->loraRuntimeStatus_.lastRssi),
-      static_cast<int>(activeInstance_->loraRuntimeStatus_.lastSnrX100),
-      activeInstance_->loraRuntimeStatus_.rxPacketCounter,
+       activeInstance_->configSnapshot_.webServerAlwaysOn,
+       activeInstance_->configSnapshot_.webServerTimeoutMinutes,
+       static_cast<unsigned long>(apAutoStopRemainingSec),
+       static_cast<unsigned>(activeInstance_->sensorDistanceMm_),
+       static_cast<unsigned>(activeInstance_->sensorFreqHz_),
+       activeInstance_->sensorValid_ ? "true" : "false",
+       activeInstance_->sensorFreqMinHz_,
+       activeInstance_->sensorFreqMaxHz_,
+       activeInstance_->sensorDistanceMinMm_,
+       activeInstance_->sensorDistanceMaxMm_,
+        static_cast<int>(activeInstance_->loraRuntimeStatus_.lastRssi),
+        static_cast<int>(activeInstance_->loraRuntimeStatus_.lastSnrX100),
+       activeInstance_->loraRuntimeStatus_.rxPacketCounter,
       activeInstance_->loraRuntimeStatus_.txPacketCounter,
       0u,
       static_cast<unsigned>(activeInstance_->lastCommandType_),
@@ -1003,12 +1022,10 @@ esp_err_t NetworkManager::ExitApHandler(httpd_req_t* request) {
     httpd_resp_set_status(request, "401 Unauthorized");
     return httpd_resp_send(request, "{\"error\":\"auth_required\"}", HTTPD_RESP_USE_STRLEN);
   }
-  shared::AppCommand command{};
-  command.source = shared::AppCommandSource::kNetwork;
-  command.type = shared::AppCommandType::kExitApMode;
-  if (!activeInstance_->QueueCommand(command)) return httpd_resp_send_500(request);
-  httpd_resp_set_status(request, "202 Accepted");
-  return httpd_resp_send(request, "{\"accepted\":true}", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_send(request, "{\"stopped\":true}", HTTPD_RESP_USE_STRLEN);
+  vTaskDelay(pdMS_TO_TICKS(50));
+  activeInstance_->SetApModeEnabled(false);
+  return ESP_OK;
 }
 
 esp_err_t NetworkManager::AuthStatusHandler(httpd_req_t* request) {
@@ -1174,14 +1191,86 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
     updatedConfig.fixedApPassword[updatedConfig.fixedApPassword.size() - 1] = '\0';
     configChanged = true;
   }
+  // Parse sensor limit fields
+  pulse::storage::SafeDockConfig sensorCfg;
+  sensorCfg.freqMinHz = 100;
+  sensorCfg.freqMaxHz = 600;
+  sensorCfg.distanceMinMm = 50;
+  sensorCfg.distanceMaxMm = 5000;
+  if (activeInstance_->ExtractFormValue(formData, "freq_min_hz", &value)) {
+    sensorCfg.freqMinHz = ClampU16(value, 50, 700);
+    configChanged = true;
+  }
+  if (activeInstance_->ExtractFormValue(formData, "freq_max_hz", &value)) {
+    sensorCfg.freqMaxHz = ClampU16(value, 50, 700);
+    configChanged = true;
+  }
+  if (activeInstance_->ExtractFormValue(formData, "distance_min_mm", &value)) {
+    sensorCfg.distanceMinMm = ClampU16(value, 10, 6000);
+    configChanged = true;
+  }
+  if (activeInstance_->ExtractFormValue(formData, "distance_max_mm", &value)) {
+    sensorCfg.distanceMaxMm = ClampU16(value, 10, 6000);
+    configChanged = true;
+  }
+  // Apply changes to configSnapshot_ immediately so /api/status reflects them
+  if (configChanged) {
+    activeInstance_->configSnapshot_.webServerAlwaysOn = updatedConfig.webServerAlwaysOn;
+    activeInstance_->configSnapshot_.webServerTimeoutMinutes = updatedConfig.webServerTimeoutMinutes;
+    std::strncpy(activeInstance_->configSnapshot_.webUsername.data(), updatedConfig.webUsername.data(),
+                 activeInstance_->configSnapshot_.webUsername.size() - 1);
+    std::strncpy(activeInstance_->configSnapshot_.webPassword.data(), updatedConfig.webPassword.data(),
+                 activeInstance_->configSnapshot_.webPassword.size() - 1);
+    std::strncpy(activeInstance_->configSnapshot_.fixedApSsid.data(), updatedConfig.fixedApSsid.data(),
+                 activeInstance_->configSnapshot_.fixedApSsid.size() - 1);
+    std::strncpy(activeInstance_->configSnapshot_.fixedApIp.data(), updatedConfig.fixedApIp.data(),
+                 activeInstance_->configSnapshot_.fixedApIp.size() - 1);
+    std::strncpy(activeInstance_->configSnapshot_.fixedApPassword.data(), updatedConfig.fixedApPassword.data(),
+                 activeInstance_->configSnapshot_.fixedApPassword.size() - 1);
+  }
   xSemaphoreGive(activeInstance_->stateMutex_);
   std::free(formData);
-  if (configChanged && (activeInstance_->configQueue_ == nullptr ||
-      xQueueSend(activeInstance_->configQueue_, &updatedConfig, 0) != pdTRUE)) {
-    return httpd_resp_send_500(request);
+  if (configChanged) {
+    if (activeInstance_->configRepo_ != nullptr) {
+      pulse::storage::SafeDockConfig fullCfg;
+      activeInstance_->configRepo_->Load(&fullCfg);
+      fullCfg.schemaVersion = 1;
+      fullCfg.freqMinHz = sensorCfg.freqMinHz;
+      fullCfg.freqMaxHz = sensorCfg.freqMaxHz;
+      fullCfg.distanceMinMm = sensorCfg.distanceMinMm;
+      fullCfg.distanceMaxMm = sensorCfg.distanceMaxMm;
+      std::strncpy(fullCfg.webUsername, updatedConfig.webUsername.data(), sizeof(fullCfg.webUsername) - 1);
+      std::strncpy(fullCfg.webPassword, updatedConfig.webPassword.data(), sizeof(fullCfg.webPassword) - 1);
+      std::strncpy(fullCfg.apSsid, updatedConfig.fixedApSsid.data(), sizeof(fullCfg.apSsid) - 1);
+      fullCfg.apSsid[sizeof(fullCfg.apSsid) - 1] = '\0';
+      std::strncpy(fullCfg.apPassword, updatedConfig.fixedApPassword.data(), sizeof(fullCfg.apPassword) - 1);
+      fullCfg.apPassword[sizeof(fullCfg.apPassword) - 1] = '\0';
+      fullCfg.webServerAlwaysOn = updatedConfig.webServerAlwaysOn;
+      fullCfg.webServerTimeoutMinutes = updatedConfig.webServerTimeoutMinutes;
+      esp_err_t saveErr = activeInstance_->configRepo_->Save(fullCfg);
+      if (saveErr != ESP_OK) {
+        ESP_LOGE(kLogTag, "Falha ao salvar config: %s", esp_err_to_name(saveErr));
+        httpd_resp_set_status(request, "500 Internal Server Error");
+        char errBody[64];
+        std::snprintf(errBody, sizeof(errBody), "{\"error\":\"save_failed\",\"code\":%d}", saveErr);
+        return httpd_resp_send(request, errBody, HTTPD_RESP_USE_STRLEN);
+      }
+      ESP_LOGI(kLogTag, "Config salva com sucesso");
+      // Update NetworkManager sensor limits from what was saved
+      activeInstance_->UpdateSensorLimits(
+          fullCfg.freqMinHz, fullCfg.freqMaxHz,
+          fullCfg.distanceMinMm, fullCfg.distanceMaxMm);
+      // Persist SSID code so always-on keeps the same SSID across reboots
+      if (activeInstance_->apSsidCode_ != 0) {
+        fullCfg.apSsidCode = activeInstance_->apSsidCode_;
+        activeInstance_->configRepo_->SaveSsidCode(activeInstance_->apSsidCode_);
+      }
+    } else {
+      ESP_LOGW(kLogTag, "configRepo_ nao definido, config nao salva");
+    }
   }
-  httpd_resp_set_status(request, "202 Accepted");
-  return httpd_resp_send(request, "{\"accepted\":true}", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_set_status(request, "200 OK");
+  return httpd_resp_send(request, "{\"saved\":true}", HTTPD_RESP_USE_STRLEN);
 }
 
 esp_err_t NetworkManager::RestartHandler(httpd_req_t* request) {
@@ -1190,11 +1279,11 @@ esp_err_t NetworkManager::RestartHandler(httpd_req_t* request) {
     httpd_resp_set_status(request, "401 Unauthorized");
     return httpd_resp_send(request, "{\"error\":\"auth_required\"}", HTTPD_RESP_USE_STRLEN);
   }
-  if (!activeInstance_->QueueHttpCommand(shared::AppCommandType::kRestartDevice, 0)) {
-    return httpd_resp_send_500(request);
-  }
-  httpd_resp_set_status(request, "202 Accepted");
-  return httpd_resp_send(request, "{\"accepted\":true}", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_set_status(request, "200 OK");
+  httpd_resp_send(request, "{\"restarting\":true}", HTTPD_RESP_USE_STRLEN);
+  vTaskDelay(pdMS_TO_TICKS(100));
+  esp_restart();
+  return ESP_OK;
 }
 
 esp_err_t NetworkManager::FactoryResetHandler(httpd_req_t* request) {
@@ -1203,52 +1292,34 @@ esp_err_t NetworkManager::FactoryResetHandler(httpd_req_t* request) {
     httpd_resp_set_status(request, "401 Unauthorized");
     return httpd_resp_send(request, "{\"error\":\"auth_required\"}", HTTPD_RESP_USE_STRLEN);
   }
-  if (!activeInstance_->QueueHttpCommand(shared::AppCommandType::kFactoryResetDevice, 0)) {
-    return httpd_resp_send_500(request);
+  if (activeInstance_->configRepo_ != nullptr) {
+    esp_err_t err = activeInstance_->configRepo_->FactoryReset();
+    if (err != ESP_OK) {
+      httpd_resp_set_status(request, "500 Internal Server Error");
+      return httpd_resp_send(request, "{\"error\":\"reset_failed\"}", HTTPD_RESP_USE_STRLEN);
+    }
+    // Reset in-memory limits to defaults
+    activeInstance_->UpdateSensorLimits(100, 600, 50, 5000);
+    activeInstance_->apSsidCode_ = 0;
   }
-  httpd_resp_set_status(request, "202 Accepted");
-  return httpd_resp_send(request, "{\"accepted\":true}", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_set_type(request, "application/json");
+  return httpd_resp_send(request,
+    "{\"reset\":true,\"message\":\"Configuracoes restauradas para fabrica. Reinicie o gateway se necessario.\"}", HTTPD_RESP_USE_STRLEN);
 }
 
 esp_err_t NetworkManager::BindingDiscoveryHandler(httpd_req_t* request) {
-  if (activeInstance_ == nullptr) return httpd_resp_send_500(request);
-  if (!activeInstance_->IsAuthenticated(request)) {
-    httpd_resp_set_status(request, "401 Unauthorized");
-    return httpd_resp_send(request, "{\"error\":\"auth_required\"}", HTTPD_RESP_USE_STRLEN);
-  }
-  if (!activeInstance_->QueueHttpCommand(shared::AppCommandType::kArmPairingWindow, 0)) {
-    return httpd_resp_send_500(request);
-  }
-  httpd_resp_set_status(request, "202 Accepted");
-  return httpd_resp_send(request, "{\"accepted\":true}", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_set_status(request, "501 Not Implemented");
+  return httpd_resp_send(request, "{\"error\":\"not_implemented\"}", HTTPD_RESP_USE_STRLEN);
 }
 
 esp_err_t NetworkManager::GroupPairingHandler(httpd_req_t* request) {
-  if (activeInstance_ == nullptr) return httpd_resp_send_500(request);
-  if (!activeInstance_->IsAuthenticated(request)) {
-    httpd_resp_set_status(request, "401 Unauthorized");
-    return httpd_resp_send(request, "{\"error\":\"auth_required\"}", HTTPD_RESP_USE_STRLEN);
-  }
-  uint16_t action = 0;
-  if (!activeInstance_->ExtractQueryValue(request, "action", &action)) return SendBadRequest(request);
-  if (!activeInstance_->QueueHttpCommand(shared::AppCommandType::kArmGroupPairingWindow, action)) {
-    return httpd_resp_send_500(request);
-  }
-  httpd_resp_set_status(request, "202 Accepted");
-  return httpd_resp_send(request, "{\"accepted\":true}", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_set_status(request, "501 Not Implemented");
+  return httpd_resp_send(request, "{\"error\":\"not_implemented\"}", HTTPD_RESP_USE_STRLEN);
 }
 
 esp_err_t NetworkManager::ModbusMasterTriggerHandler(httpd_req_t* request) {
-  if (activeInstance_ == nullptr) return httpd_resp_send_500(request);
-  if (!activeInstance_->IsAuthenticated(request)) {
-    httpd_resp_set_status(request, "401 Unauthorized");
-    return httpd_resp_send(request, "{\"error\":\"auth_required\"}", HTTPD_RESP_USE_STRLEN);
-  }
-  if (!activeInstance_->QueueHttpCommand(shared::AppCommandType::kModbusMasterPollNow, 0)) {
-    return httpd_resp_send_500(request);
-  }
-  httpd_resp_set_status(request, "202 Accepted");
-  return httpd_resp_send(request, "{\"accepted\":true}", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_set_status(request, "501 Not Implemented");
+  return httpd_resp_send(request, "{\"error\":\"not_implemented\"}", HTTPD_RESP_USE_STRLEN);
 }
 
 esp_err_t NetworkManager::IoConfigHandler(httpd_req_t* request) {
@@ -1449,23 +1520,30 @@ bool NetworkManager::QueueHttpCommand(shared::AppCommandType type, uint16_t valu
 
 esp_err_t NetworkManager::EnsureWifiStack() {
   if (wifiStackReady_) return ESP_OK;
+  ESP_LOGI(kLogTag, "EnsureWifiStack: esp_netif_init...");
   esp_err_t err = esp_netif_init();
+  ESP_LOGI(kLogTag, "EnsureWifiStack: esp_netif_init=%s", esp_err_to_name(err));
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
   err = esp_event_loop_create_default();
+  ESP_LOGI(kLogTag, "EnsureWifiStack: event_loop=%s", esp_err_to_name(err));
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
   if (apNetif_ == nullptr) {
     apNetif_ = esp_netif_create_default_wifi_ap();
-    if (apNetif_ == nullptr) return ESP_FAIL;
+    if (apNetif_ == nullptr) { ESP_LOGE(kLogTag, "apNetif_ is NULL"); return ESP_FAIL; }
   }
+  ESP_LOGI(kLogTag, "EnsureWifiStack: esp_wifi_init...");
   wifi_init_config_t wifiInitConfig = WIFI_INIT_CONFIG_DEFAULT();
   err = esp_wifi_init(&wifiInitConfig);
+  ESP_LOGI(kLogTag, "EnsureWifiStack: esp_wifi_init=%s", esp_err_to_name(err));
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
   err = esp_wifi_set_storage(WIFI_STORAGE_RAM);
-  if (err != ESP_OK) return err;
+  if (err != ESP_OK) { ESP_LOGE(kLogTag, "set_storage failed: %s", esp_err_to_name(err)); return err; }
   err = esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
       &NetworkManager::HandleWifiEvent, nullptr, nullptr);
+  ESP_LOGI(kLogTag, "EnsureWifiStack: handler_reg=%s", esp_err_to_name(err));
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
   wifiStackReady_ = true;
+  ESP_LOGI(kLogTag, "EnsureWifiStack: DONE");
   return ESP_OK;
 }
 
@@ -1520,9 +1598,13 @@ esp_err_t NetworkManager::StartApMode() {
   // Lazy task creation — only runs when webserver is actually requested.
   if (taskHandle_ == nullptr) {
     BaseType_t taskCreated = xTaskCreate(&NetworkManager::TaskEntry, "network_task", kNetworkTaskStackSize, this, 3, &taskHandle_);
-    if (taskCreated != pdPASS) return ESP_ERR_NO_MEM;
+    if (taskCreated != pdPASS) {
+      ESP_LOGE(kLogTag, "xTaskCreate falhou");
+      return ESP_ERR_NO_MEM;
+    }
   }
 
+  ESP_LOGI(kLogTag, "StartApMode: EnsureWifiStack...");
   auto rollback_ap_start = [this]() {
     if (httpServer_ != nullptr) {
       httpd_stop(httpServer_);
@@ -1545,11 +1627,16 @@ esp_err_t NetworkManager::StartApMode() {
     ESP_LOGE(kLogTag, "EnsureWifiStack falhou: %s", esp_err_to_name(err));
     return err;
   }
+  ESP_LOGI(kLogTag, "StartApMode: WiFi stack OK, configurando AP...");
 
   wifi_config_t wifiConfig = {};
-  apSsidCode_ = static_cast<uint16_t>(esp_random() % 10000u);
+  // Reuse SSID code when always-on is enabled, otherwise generate new
+  if (configSnapshot_.webServerAlwaysOn == 0 || apSsidCode_ == 0) {
+    apSsidCode_ = static_cast<uint16_t>(esp_random() % 10000u);
+  }
   BuildApSsid(reinterpret_cast<char*>(wifiConfig.ap.ssid), sizeof(wifiConfig.ap.ssid));
-  wifiConfig.ap.ssid_len = std::strlen(reinterpret_cast<const char*>(wifiConfig.ap.ssid));
+  wifiConfig.ap.ssid_len = static_cast<uint8_t>(std::strlen(reinterpret_cast<const char*>(wifiConfig.ap.ssid)));
+  ESP_LOGI(kLogTag, "SSID='%.*s' len=%u", wifiConfig.ap.ssid_len, wifiConfig.ap.ssid, wifiConfig.ap.ssid_len);
   wifiConfig.ap.channel = kApChannel;
   wifiConfig.ap.max_connection = kApMaxConnections;
   const char* effectiveApPassword =
@@ -1561,6 +1648,7 @@ esp_err_t NetworkManager::StartApMode() {
   wifiConfig.ap.pairwise_cipher = WIFI_CIPHER_TYPE_CCMP;
   wifiConfig.ap.pmf_cfg.capable = true;
   wifiConfig.ap.pmf_cfg.required = false;
+  wifiConfig.ap.ssid_hidden = 0;
 
   esp_netif_ip_info_t configuredIpInfo{};
   if (!BuildConfiguredApIpInfo(configSnapshot_, &configuredIpInfo)) {
@@ -1599,12 +1687,13 @@ esp_err_t NetworkManager::StartApMode() {
     ESP_LOGE(kLogTag, "wifi_start() falhou: %s", esp_err_to_name(err));
     return err;
   }
+  ESP_LOGI(kLogTag, "StartApMode: WiFi iniciado, ligando HTTP server...");
 
   if (httpServer_ == nullptr) {
     httpd_config_t httpConfig = HTTPD_DEFAULT_CONFIG();
     httpConfig.server_port = 80;
     httpConfig.stack_size = kHttpServerStackSize;
-    httpConfig.max_uri_handlers = 16;
+    httpConfig.max_uri_handlers = 24;
     err = httpd_start(&httpServer_, &httpConfig);
     if (err != ESP_OK) {
       ESP_LOGE(kLogTag, "httpd_start() falhou: %s", esp_err_to_name(err));

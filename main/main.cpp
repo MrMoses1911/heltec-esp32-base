@@ -7,6 +7,9 @@
 #include "storage/config_repository.h"
 #include "system/network_manager.h"
 #include "shared/app_types.h"
+#include "esp_log.h"
+
+void run_all_tests(void);
 
 using namespace pulse::ui;
 
@@ -46,6 +49,13 @@ static pulse::shared::DeviceConfig MakeDeviceConfig(const pulse::storage::SafeDo
 
 void setup() {
   Serial.begin(115200);
+  esp_log_level_set("*", ESP_LOG_INFO);
+
+  // Run unit tests at boot
+  Serial.println("\n\n=== Iniciando Testes Unitarios ===");
+  run_all_tests();
+  Serial.println("=== Testes Concluidos ===\n");
+
   pulse::platform::InitializeBoard();
 
   g_nvs.Initialize();
@@ -55,6 +65,30 @@ void setup() {
   g_menu.SetConfig(config);
 
   g_networkManager.Initialize(nullptr, MakeDeviceConfig(config));
+  g_networkManager.SetConfigRepository(&g_configRepo);
+  g_networkManager.UpdateSensorLimits(
+    config.freqMinHz, config.freqMaxHz,
+    config.distanceMinMm, config.distanceMaxMm);
+
+  // Auto-start webserver if always-on is enabled
+  if (config.webServerAlwaysOn) {
+    uint16_t savedCode = 0;
+    g_configRepo.LoadSsidCode(&savedCode);
+    if (savedCode != 0) {
+      g_networkManager.SetApSsidCode(savedCode);
+    }
+    auto devCfg = MakeDeviceConfig(config);
+    esp_err_t err = g_networkManager.SetApModeEnabled(true);
+    if (err == ESP_OK) {
+      g_networkManager.UpdateSnapshot(
+        pulse::shared::SystemState::kApMode,
+        devCfg,
+        pulse::shared::IoSnapshot{},
+        pulse::shared::LoRaRuntimeStatus{});
+      g_webServerActive = true;
+      Serial.println("Webserver auto-iniciado (always-on)");
+    }
+  }
 
   g_menu.NavigateTo(pulse::ui::Screen::kMainMenu);
   pulse::ui::ShowBootLogo();
@@ -77,17 +111,28 @@ void loop() {
     g_menu.ClearWebServerRequested();
     pulse::storage::SafeDockConfig cfg = g_menu.GetConfig();
     auto devCfg = MakeDeviceConfig(cfg);
-    g_networkManager.SetApModeEnabled(true);
-    g_networkManager.UpdateSnapshot(
-      pulse::shared::SystemState::kApMode,
-      devCfg,
-      pulse::shared::IoSnapshot{},
-      pulse::shared::LoRaRuntimeStatus{});
-    g_webServerActive = true;
-    Serial.println("Webserver iniciado");
+    esp_err_t err = g_networkManager.SetApModeEnabled(true);
+    if (err != ESP_OK) {
+      Serial.printf("ERRO ao iniciar webserver: 0x%X (%s)\n", err, esp_err_to_name(err));
+    } else {
+      g_networkManager.UpdateSnapshot(
+        pulse::shared::SystemState::kApMode,
+        devCfg,
+        pulse::shared::IoSnapshot{},
+        pulse::shared::LoRaRuntimeStatus{});
+      g_webServerActive = true;
+      Serial.println("Webserver iniciado. IP: 192.168.10.1  SSID: SafeDock_XXXX  Senha: Pulse123");
+    }
   }
 
   g_sensor.update();
+
+  if (g_webServerActive) {
+    g_networkManager.UpdateSensorData(
+      g_sensor.getDistanceMm(),
+      g_sensor.getFrequencyHz(),
+      g_sensor.getStatus() == Q5X_PFM::kOk);
+  }
 
   if (now - g_lastUptimeSecond >= 60000) {
     g_lastUptimeSecond = now;

@@ -32,6 +32,7 @@ private:
   static constexpr float kMadReject = 3.0f;
 
   static void isrHandler(void *arg);
+  uint32_t medianPeriod();
 
   int m_gpio = 38;
   bool m_initialized = false;
@@ -43,12 +44,14 @@ private:
 
   uint32_t m_readPeriodUs = 0;
 
+  volatile uint32_t m_isrLastEdgeUs = 0;
   volatile uint32_t m_isrBuf[kBufSize] = {};
   volatile uint8_t m_isrIdx = 0;
   volatile uint8_t m_isrCount = 0;
   volatile bool m_isrNewData = false;
   volatile uint32_t m_isrLastValidUs = 0;
   volatile uint32_t m_isrRejected = 0;
+  volatile uint32_t m_isrValidPulses = 0;
 };
 
 #endif

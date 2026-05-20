@@ -7,7 +7,8 @@ MenuManager::MenuManager()
   : currentScreen_(Screen::kMainMenu),
     selection_(0),
     factoryResetConfirmed_(false),
-    webServerRequested_(false) {}
+    webServerRequested_(false),
+    distanceMode_(DistanceMode::kFiltered) {}
 
 void MenuManager::Reset() {
   currentScreen_ = Screen::kMainMenu;
@@ -18,6 +19,12 @@ void MenuManager::Reset() {
 
 void MenuManager::HandleButtonClick() {
   switch (currentScreen_) {
+    case Screen::kDistanceView:
+      // Toggle between raw and filtered display
+      distanceMode_ = (distanceMode_ == DistanceMode::kFiltered)
+                      ? DistanceMode::kRaw
+                      : DistanceMode::kFiltered;
+      break;
     case Screen::kMainMenu:
       selection_ = (selection_ + 1) % 3;
       break;
@@ -61,12 +68,9 @@ void MenuManager::HandleButtonLongPress() {
     case Screen::kWebServerConfirm:
       if (selection_ == 0) {
         webServerRequested_ = true;
-        currentScreen_ = Screen::kWebServerMenu;
-        selection_ = 0;
-      } else {
-        currentScreen_ = Screen::kMainMenu;
-        selection_ = 0;
       }
+      currentScreen_ = Screen::kMainMenu;
+      selection_ = 1;  // keep "Webserver" highlighted
       break;
 
     case Screen::kWebServerMenu:
@@ -142,6 +146,16 @@ void MenuManager::SetDistanceReading(float mm, float hz, bool valid) {
 
 const MenuManager::DistanceData& MenuManager::GetDistanceData() const {
   return distanceData_;
+}
+
+pulse::ui::DistanceMode MenuManager::GetDistanceMode() const {
+  return distanceMode_;
+}
+
+void MenuManager::ToggleDistanceMode() {
+  distanceMode_ = (distanceMode_ == DistanceMode::kFiltered)
+                  ? DistanceMode::kRaw
+                  : DistanceMode::kFiltered;
 }
 
 void MenuManager::SetWebServerState(uint16_t alwaysOn, uint16_t timeoutMin, const char* ssid, const char* password, const char* username) {
