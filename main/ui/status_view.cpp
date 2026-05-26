@@ -36,7 +36,7 @@ static void DrawMenu(const char* title, const char* const* items, uint8_t itemCo
 
 void ShowBootLogo() {
   DisplayClear();
-  DisplayDrawImage(0, 0, 128, 64, kBootLogo);
+  DisplayDrawPageImage(0, 0, kBootLogoWidth, kBootLogoHeight, logo_pulse_automa_o_compacto);
   DisplayPresent();
 }
 
@@ -51,12 +51,18 @@ void ShowFatalError(esp_err_t err) {
 }
 
 // ── Main Menu ──────────────────────────────────────────────
-void RenderMainMenu(uint8_t selection) {
-  static const char* items[] = {
+void RenderMainMenu(uint8_t selection, bool webServerActive) {
+  static const char* itemsOn[] = {
+    "Distancia Laser",
+    "Desligar Webserver",
+    "Reset de Fabrica"
+  };
+  static const char* itemsOff[] = {
     "Distancia Laser",
     "Webserver",
     "Reset de Fabrica"
   };
+  const char* const* items = webServerActive ? itemsOn : itemsOff;
   DrawMenu("Pulse SafeDock", items, 3, selection);
 }
 
@@ -249,7 +255,7 @@ void RenderStatus(const MenuManager& manager) {
 
   switch (s) {
     case Screen::kMainMenu:
-      RenderMainMenu(sel);
+      RenderMainMenu(sel, manager.IsWebServerActive());
       break;
     case Screen::kDistanceView: {
       auto& dd = manager.GetDistanceData();

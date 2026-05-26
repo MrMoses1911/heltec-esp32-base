@@ -24,11 +24,30 @@ esp_err_t NvsStore::ReadU16(const char* nameSpace, const char* key, uint16_t* va
   return err;
 }
 
+esp_err_t NvsStore::ReadI16(const char* nameSpace, const char* key, int16_t* value) const {
+  nvs_handle_t handle = 0;
+  esp_err_t err = Open(nameSpace, NVS_READONLY, &handle);
+  if (err != ESP_OK) return err;
+  err = nvs_get_i16(handle, key, value);
+  nvs_close(handle);
+  return err;
+}
+
 esp_err_t NvsStore::WriteU16(const char* nameSpace, const char* key, uint16_t value) const {
   nvs_handle_t handle = 0;
   esp_err_t err = Open(nameSpace, NVS_READWRITE, &handle);
   if (err != ESP_OK) return err;
   err = nvs_set_u16(handle, key, value);
+  if (err == ESP_OK) err = nvs_commit(handle);
+  nvs_close(handle);
+  return err;
+}
+
+esp_err_t NvsStore::WriteI16(const char* nameSpace, const char* key, int16_t value) const {
+  nvs_handle_t handle = 0;
+  esp_err_t err = Open(nameSpace, NVS_READWRITE, &handle);
+  if (err != ESP_OK) return err;
+  err = nvs_set_i16(handle, key, value);
   if (err == ESP_OK) err = nvs_commit(handle);
   nvs_close(handle);
   return err;

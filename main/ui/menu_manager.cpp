@@ -8,6 +8,8 @@ MenuManager::MenuManager()
     selection_(0),
     factoryResetConfirmed_(false),
     webServerRequested_(false),
+    webServerStopRequested_(false),
+    webServerActive_(false),
     distanceMode_(DistanceMode::kFiltered) {}
 
 void MenuManager::Reset() {
@@ -15,6 +17,8 @@ void MenuManager::Reset() {
   selection_ = 0;
   factoryResetConfirmed_ = false;
   webServerRequested_ = false;
+  webServerStopRequested_ = false;
+  webServerActive_ = false;
 }
 
 void MenuManager::HandleButtonClick() {
@@ -52,8 +56,14 @@ void MenuManager::HandleButtonLongPress() {
       if (selection_ == 0) {
         currentScreen_ = Screen::kDistanceView;
       } else if (selection_ == 1) {
-        currentScreen_ = Screen::kWebServerConfirm;
-        selection_ = 0;
+        if (webServerActive_) {
+          webServerStopRequested_ = true;
+          currentScreen_ = Screen::kMainMenu;
+          selection_ = 1;
+        } else {
+          currentScreen_ = Screen::kWebServerConfirm;
+          selection_ = 0;
+        }
       } else if (selection_ == 2) {
         currentScreen_ = Screen::kFactoryResetConfirm;
         selection_ = 0;
@@ -136,6 +146,22 @@ bool MenuManager::IsWebServerRequested() const {
 
 void MenuManager::ClearWebServerRequested() {
   webServerRequested_ = false;
+}
+
+bool MenuManager::IsWebServerStopRequested() const {
+  return webServerStopRequested_;
+}
+
+void MenuManager::ClearWebServerStopRequested() {
+  webServerStopRequested_ = false;
+}
+
+void MenuManager::SetWebServerActive(bool active) {
+  webServerActive_ = active;
+}
+
+bool MenuManager::IsWebServerActive() const {
+  return webServerActive_;
 }
 
 void MenuManager::SetDistanceReading(float mm, float hz, bool valid) {

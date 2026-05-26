@@ -79,12 +79,18 @@ class MenuManager {
   void NavigateTo(Screen screen);
   bool IsWebServerRequested() const;
   void ClearWebServerRequested();
+  bool IsWebServerStopRequested() const;
+  void ClearWebServerStopRequested();
+  void SetWebServerActive(bool active);
+  bool IsWebServerActive() const;
 
  private:
   Screen currentScreen_;
   uint8_t selection_;
   bool factoryResetConfirmed_;
   bool webServerRequested_;
+  bool webServerStopRequested_;
+  bool webServerActive_;
   DistanceData distanceData_;
   DistanceMode distanceMode_;
   WebServerData webServerData_;

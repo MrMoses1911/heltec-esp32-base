@@ -11,7 +11,7 @@ namespace ui {
 void ShowBootLogo();
 void ShowFatalError(esp_err_t err);
 
-void RenderMainMenu(uint8_t selection);
+void RenderMainMenu(uint8_t selection, bool webServerActive = false);
 void RenderDistanceView(float distanceMm, float freqHz, bool valid, DistanceMode mode);
 void RenderWebServerConfirm(uint8_t selection);
 void RenderWebServerMenu(uint8_t selection);

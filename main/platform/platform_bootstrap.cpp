@@ -88,6 +88,23 @@ void DisplayDrawImage(int16_t x, int16_t y, int16_t width, int16_t height, const
   display.drawFastImage(x, y, width, height, image);
 }
 
+void DisplayDrawPageImage(int16_t x, int16_t y, int16_t width, int16_t height, const uint8_t* image) {
+  if (image == nullptr || width <= 0 || height <= 0) return;
+  const int16_t pageCount = static_cast<int16_t>((height + 7) / 8);
+  for (int16_t page = 0; page < pageCount; ++page) {
+    for (int16_t column = 0; column < width; ++column) {
+      const uint8_t data = image[page * width + column];
+      for (int16_t bit = 0; bit < 8; ++bit) {
+        const int16_t pixelY = y + page * 8 + bit;
+        if (pixelY >= (y + height)) break;
+        if ((data & (1u << bit)) != 0) {
+          display.setPixel(x + column, pixelY);
+        }
+      }
+    }
+  }
+}
+
 void DisplayPresent() {
   display.displayOn();
   display.display();

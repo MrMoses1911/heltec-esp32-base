@@ -8,6 +8,8 @@
 #include "system/network_manager.h"
 #include "shared/app_types.h"
 #include "esp_log.h"
+#include "driver/gpio.h"
+#include <math.h>
 
 void run_all_tests(void);
 
@@ -25,6 +27,10 @@ static unsigned long g_lastRenderMs = 0;
 static unsigned long g_lastUptimeSecond = 0;
 static uint32_t g_uptimeMinutes = 0;
 static bool g_webServerActive = false;
+static uint16_t g_adjacentMm = 2000;
+static int16_t g_offsetMm = 0;
+static uint16_t g_alarmMinMm = 500;
+static uint16_t g_alarmMaxMm = 1500;
 
 void TryFactoryReset() {
   Serial.println("Executando factory reset...");
@@ -70,6 +76,21 @@ void setup() {
     config.freqMinHz, config.freqMaxHz,
     config.distanceMinMm, config.distanceMaxMm);
 
+  // ── Load geometry config and setup alarm GPIO ────────────
+  g_configRepo.LoadGeoConfig(&g_adjacentMm, &g_offsetMm,
+                             &g_alarmMinMm, &g_alarmMaxMm);
+  g_networkManager.UpdateGeometryData(0, 0, g_adjacentMm, g_offsetMm,
+    g_alarmMinMm, g_alarmMaxMm, false);
+
+  gpio_config_t alarmCfg = {};
+  alarmCfg.pin_bit_mask = 1ULL << config.alarmGpio;
+  alarmCfg.mode = GPIO_MODE_OUTPUT;
+  alarmCfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  alarmCfg.pull_up_en = GPIO_PULLUP_DISABLE;
+  gpio_config(&alarmCfg);
+  gpio_set_level(static_cast<gpio_num_t>(config.alarmGpio), 0);
+  Serial.printf("Alarme GPIO %d configurado\n", config.alarmGpio);
+
   // Auto-start webserver if always-on is enabled
   if (config.webServerAlwaysOn) {
     uint16_t savedCode = 0;
@@ -86,13 +107,14 @@ void setup() {
         pulse::shared::IoSnapshot{},
         pulse::shared::LoRaRuntimeStatus{});
       g_webServerActive = true;
+      g_menu.SetWebServerActive(true);
       Serial.println("Webserver auto-iniciado (always-on)");
     }
   }
 
   g_menu.NavigateTo(pulse::ui::Screen::kMainMenu);
   pulse::ui::ShowBootLogo();
-  delay(1500);
+  delay(4000);
 
   g_sensor.init();
   g_bootMs = millis();
@@ -121,17 +143,48 @@ void loop() {
         pulse::shared::IoSnapshot{},
         pulse::shared::LoRaRuntimeStatus{});
       g_webServerActive = true;
-      Serial.println("Webserver iniciado. IP: 192.168.10.1  SSID: SafeDock_XXXX  Senha: Pulse123");
+      g_menu.SetWebServerActive(true);
+      Serial.println("Webserver iniciado");
     }
+  }
+
+  if (g_menu.IsWebServerStopRequested() && g_webServerActive) {
+    g_menu.ClearWebServerStopRequested();
+    g_networkManager.SetApModeEnabled(false);
+    g_webServerActive = false;
+    g_menu.SetWebServerActive(false);
+    Serial.println("Webserver parado");
   }
 
   g_sensor.update();
 
+  // ── Pythagoras: vehicle distance + alarm GPIO ────────────
+  float rawDist = g_sensor.getDistanceMm();
+  float freq = g_sensor.getFrequencyHz();
+  bool valid = (g_sensor.getStatus() == Q5X_PFM::kOk);
+  float vehicleDist = 0;
+
+  if (valid && g_adjacentMm > 0) {
+    float h2 = rawDist * rawDist;
+    float a2 = static_cast<float>(g_adjacentMm) * g_adjacentMm;
+    if (h2 > a2) {
+      vehicleDist = sqrtf(h2 - a2);
+    } else {
+      vehicleDist = 0;
+    }
+  } else {
+    // adjacentMm=0: direct measurement, no Pythagoras
+    vehicleDist = valid ? rawDist : 0;
+  }
+  if (vehicleDist < 0) vehicleDist = 0;
+
+  bool alarmActive = (vehicleDist >= g_alarmMinMm && vehicleDist <= g_alarmMaxMm);
+  gpio_set_level(static_cast<gpio_num_t>(39), alarmActive ? 1 : 0);
+
   if (g_webServerActive) {
-    g_networkManager.UpdateSensorData(
-      g_sensor.getDistanceMm(),
-      g_sensor.getFrequencyHz(),
-      g_sensor.getStatus() == Q5X_PFM::kOk);
+    g_networkManager.UpdateSensorData(rawDist, freq, valid);
+    g_networkManager.UpdateGeometryData(vehicleDist, rawDist,
+      g_adjacentMm, g_offsetMm, g_alarmMinMm, g_alarmMaxMm, alarmActive);
   }
 
   if (now - g_lastUptimeSecond >= 60000) {
@@ -141,10 +194,7 @@ void loop() {
 
   if (now - g_lastDistanceDisplayMs >= 250) {
     g_lastDistanceDisplayMs = now;
-    float dist = g_sensor.getDistanceMm();
-    float freq = g_sensor.getFrequencyHz();
-    auto status = g_sensor.getStatus();
-    g_menu.SetDistanceReading(dist, freq, status == Q5X_PFM::kOk);
+    g_menu.SetDistanceReading(rawDist, freq, valid);
   }
 
   if (pulse::platform::ConsumeButtonSingleClick()) {

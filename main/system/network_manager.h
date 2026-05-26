@@ -46,6 +46,9 @@ class NetworkManager {
   uint32_t GetApAutoStopRemainingSeconds() const;
   void UpdateSensorData(float distanceMm, float freqHz, bool valid);
   void UpdateSensorLimits(uint16_t freqMin, uint16_t freqMax, uint16_t distMin, uint16_t distMax);
+  void UpdateGeometryData(float vehicleDistanceMm, float hypotenuseMm,
+                         uint16_t adjacentMm, int16_t offsetMm,
+                         uint16_t alarmMinMm, uint16_t alarmMaxMm, bool alarmActive);
   void SetConfigRepository(pulse::storage::ConfigRepository* repo);
   void SetApSsidCode(uint16_t code);
   uint16_t GetApSsidCode() const;
@@ -136,6 +139,13 @@ class NetworkManager {
   uint16_t sensorFreqMaxHz_;
   uint16_t sensorDistanceMinMm_;
   uint16_t sensorDistanceMaxMm_;
+  float vehicleDistanceMm_;
+  float hypotenuseMm_;
+  uint16_t adjacentMm_;
+  int16_t offsetMm_;
+  uint16_t alarmMinMm_;
+  uint16_t alarmMaxMm_;
+  bool alarmActive_;
   pulse::storage::ConfigRepository* configRepo_;
 
   static NetworkManager* activeInstance_;
