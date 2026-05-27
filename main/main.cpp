@@ -31,6 +31,7 @@ static uint16_t g_adjacentMm = 2000;
 static int16_t g_offsetMm = 0;
 static uint16_t g_alarmMinMm = 500;
 static uint16_t g_alarmMaxMm = 1500;
+static uint16_t g_alarmMode = 0;
 
 void TryFactoryReset() {
   Serial.println("Executando factory reset...");
@@ -78,9 +79,9 @@ void setup() {
 
   // ── Load geometry config and setup alarm GPIO ────────────
   g_configRepo.LoadGeoConfig(&g_adjacentMm, &g_offsetMm,
-                             &g_alarmMinMm, &g_alarmMaxMm);
+                             &g_alarmMinMm, &g_alarmMaxMm, &g_alarmMode);
   g_networkManager.UpdateGeometryData(0, 0, g_adjacentMm, g_offsetMm,
-    g_alarmMinMm, g_alarmMaxMm, false);
+    g_alarmMinMm, g_alarmMaxMm, g_alarmMode, false);
 
   gpio_config_t alarmCfg = {};
   alarmCfg.pin_bit_mask = 1ULL << config.alarmGpio;
@@ -178,13 +179,15 @@ void loop() {
   }
   if (vehicleDist < 0) vehicleDist = 0;
 
-  bool alarmActive = (vehicleDist >= g_alarmMinMm && vehicleDist <= g_alarmMaxMm);
+  bool alarmActive = (g_alarmMode == 0)
+    ? (vehicleDist >= g_alarmMinMm && vehicleDist <= g_alarmMaxMm)   // zona
+    : (vehicleDist < g_alarmMinMm || vehicleDist > g_alarmMaxMm);   // limite
   gpio_set_level(static_cast<gpio_num_t>(39), alarmActive ? 1 : 0);
 
   if (g_webServerActive) {
     g_networkManager.UpdateSensorData(rawDist, freq, valid);
     g_networkManager.UpdateGeometryData(vehicleDist, rawDist,
-      g_adjacentMm, g_offsetMm, g_alarmMinMm, g_alarmMaxMm, alarmActive);
+      g_adjacentMm, g_offsetMm, g_alarmMinMm, g_alarmMaxMm, g_alarmMode, alarmActive);
   }
 
   if (now - g_lastUptimeSecond >= 60000) {

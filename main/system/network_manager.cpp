@@ -173,6 +173,7 @@ NetworkManager::NetworkManager()
       offsetMm_(0),
       alarmMinMm_(500),
       alarmMaxMm_(1500),
+      alarmMode_(0),
       alarmActive_(false),
       configRepo_(nullptr) {
   activeInstance_ = this;
@@ -333,13 +334,15 @@ void NetworkManager::UpdateSensorLimits(uint16_t freqMin, uint16_t freqMax, uint
 }
 
 void NetworkManager::UpdateGeometryData(float vehicleDistanceMm, float hypotenuseMm,
-    uint16_t adjacentMm, int16_t offsetMm, uint16_t alarmMinMm, uint16_t alarmMaxMm, bool alarmActive) {
+    uint16_t adjacentMm, int16_t offsetMm, uint16_t alarmMinMm, uint16_t alarmMaxMm,
+    uint16_t alarmMode, bool alarmActive) {
   vehicleDistanceMm_ = vehicleDistanceMm;
   hypotenuseMm_ = hypotenuseMm;
   adjacentMm_ = adjacentMm;
   offsetMm_ = offsetMm;
   alarmMinMm_ = alarmMinMm;
   alarmMaxMm_ = alarmMaxMm;
+  alarmMode_ = alarmMode;
   alarmActive_ = alarmActive;
 }
 
@@ -500,7 +503,7 @@ R"html(
         <div style='text-align:center;padding:16px;'>
           <div style='font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;'>Distancia do veiculo</div>
           <div style='font-size:2.2rem;font-weight:700;color:#fff;margin:8px 0;'><span id='vehicleDistance'>--</span> <span style='font-size:1rem;color:var(--muted);'>mm</span></div>
-          <div><span id='alarmState' class='status-chip'>--</span></div>
+          <div><span id='alarmState' class='status-chip'>--</span> <small style='color:var(--muted);' id='alarmModeLabel'></small></div>
         </div>
       </section>
 
@@ -596,6 +599,8 @@ R"html(
       const alarmEl=document.getElementById('alarmState')
       alarmEl.textContent=alarmOn?'ALARME ATIVO':'OK'
       alarmEl.className='status-chip '+(alarmOn?'alarm':'ok')
+      const modeEl=document.getElementById('alarmModeLabel')
+      modeEl.textContent=Number(data.alarm_mode||0)===0?'Zona':'Limite'
 
       document.getElementById('runState').textContent=stateName(data.state)
       document.getElementById('runAlias').textContent=String(data.alias||'--')
@@ -724,6 +729,10 @@ R"html(
         </summary>
         <div class='section-body'>
           <div class='grid'>
+            <label><span>Modo de alarme</span><select id='alarmMode' onchange='triggerAutoSave()'>
+              <option value='0'>Zona (alarme quando DENTRO)</option>
+              <option value='1'>Limite (alarme quando FORA)</option>
+            </select></label>
             <label><span>Dist. sensor → doca (mm)</span><input id='adjacentMm' type='number' min='100' max='50000' value='2000' onchange='triggerAutoSave()'></label>
             <label><span>Offset +/- (mm)</span><input id='offsetMm' type='number' min='-5000' max='5000' value='0' onchange='triggerAutoSave()'></label>
             <label><span>Alarme minimo (mm)</span><input id='alarmMinMm' type='number' min='0' max='50000' value='500' onchange='triggerAutoSave()'></label>
@@ -863,7 +872,7 @@ R"html(
     }
     async function autoSave(){
       autoSaveTimer=null
-      const payload={freq_min_hz:v('freqMinHz'),freq_max_hz:v('freqMaxHz'),distance_min_mm:v('distanceMinMm'),distance_max_mm:v('distanceMaxMm'),adjacent_mm:v('adjacentMm'),offset_mm:v('offsetMm'),alarm_min_mm:v('alarmMinMm'),alarm_max_mm:v('alarmMaxMm'),web_always_on:v('webAlwaysOn'),web_timeout_minutes:v('webTimeoutMinutes'),fixed_ssid:v('fixedApSsid'),fixed_ip:v('fixedApIp'),alias:String(latestData?latestData.alias:1)}
+      const payload={freq_min_hz:v('freqMinHz'),freq_max_hz:v('freqMaxHz'),distance_min_mm:v('distanceMinMm'),distance_max_mm:v('distanceMaxMm'),adjacent_mm:v('adjacentMm'),offset_mm:v('offsetMm'),alarm_min_mm:v('alarmMinMm'),alarm_max_mm:v('alarmMaxMm'),alarm_mode:v('alarmMode'),web_always_on:v('webAlwaysOn'),web_timeout_minutes:v('webTimeoutMinutes'),fixed_ssid:v('fixedApSsid'),fixed_ip:v('fixedApIp'),alias:String(latestData?latestData.alias:1)}
       const webUser=v('webUsername')
       const webPass=v('webPassword')
       if(webUser){payload.web_user=webUser}
@@ -910,6 +919,7 @@ R"html(
         document.getElementById('offsetMm').value=String(latestData.offset_mm||0)
         document.getElementById('alarmMinMm').value=String(latestData.alarm_min_mm||500)
         document.getElementById('alarmMaxMm').value=String(latestData.alarm_max_mm||1500)
+        document.getElementById('alarmMode').value=String(latestData.alarm_mode||0)
         document.getElementById('webAlwaysOn').value=String(latestData.web_server_always_on||0)
         document.getElementById('webTimeoutMinutes').value=String(latestData.web_server_timeout_minutes||15)
         document.getElementById('fixedApSsid').value=latestData.configured_ssid||''
@@ -990,6 +1000,7 @@ esp_err_t NetworkManager::StatusHandler(httpd_req_t* request) {
       "\"alarm_active\":%s,"
       "\"alarm_min_mm\":%u,"
       "\"alarm_max_mm\":%u,"
+      "\"alarm_mode\":%u,"
       "\"freq_min_hz\":%u,"
       "\"freq_max_hz\":%u,"
       "\"distance_min_mm\":%u,"
@@ -1048,6 +1059,7 @@ esp_err_t NetworkManager::StatusHandler(httpd_req_t* request) {
         activeInstance_->alarmActive_ ? "true" : "false",
         activeInstance_->alarmMinMm_,
         activeInstance_->alarmMaxMm_,
+        activeInstance_->alarmMode_,
        activeInstance_->sensorFreqMinHz_,
        activeInstance_->sensorFreqMaxHz_,
        activeInstance_->sensorDistanceMinMm_,
@@ -1289,7 +1301,7 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
   // Parse geometry and alarm fields
   uint16_t adjMm = activeInstance_->adjacentMm_;
   int16_t offMm = activeInstance_->offsetMm_;
-  uint16_t alMin = 500, alMax = 1500;
+  uint16_t alMin = 500, alMax = 1500, alMode = 0;
   if (activeInstance_->ExtractFormValue(formData, "adjacent_mm", &value)) {
     adjMm = ClampU16(value, 100, 50000);
     configChanged = true;
@@ -1304,6 +1316,10 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
   }
   if (activeInstance_->ExtractFormValue(formData, "alarm_max_mm", &value)) {
     alMax = value;
+    configChanged = true;
+  }
+  if (activeInstance_->ExtractFormValue(formData, "alarm_mode", &value)) {
+    alMode = (value > 0) ? 1 : 0;
     configChanged = true;
   }
   // Apply changes to configSnapshot_ immediately so /api/status reflects them
@@ -1359,7 +1375,7 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
       // Save geometry config separately
       activeInstance_->adjacentMm_ = adjMm;
       activeInstance_->offsetMm_ = offMm;
-      activeInstance_->configRepo_->SaveGeoConfig(adjMm, offMm, alMin, alMax);
+      activeInstance_->configRepo_->SaveGeoConfig(adjMm, offMm, alMin, alMax, alMode);
       // Persist SSID code so always-on keeps the same SSID across reboots
       if (activeInstance_->apSsidCode_ != 0) {
         fullCfg.apSsidCode = activeInstance_->apSsidCode_;
@@ -1404,9 +1420,10 @@ esp_err_t NetworkManager::FactoryResetHandler(httpd_req_t* request) {
     // Reset geometry + alarm to defaults
     activeInstance_->adjacentMm_ = 2000;
     activeInstance_->offsetMm_ = 0;
-    activeInstance_->alarmMinMm_ = 500;
-    activeInstance_->alarmMaxMm_ = 1500;
-    activeInstance_->alarmActive_ = false;
+      activeInstance_->alarmMinMm_ = 500;
+      activeInstance_->alarmMaxMm_ = 1500;
+      activeInstance_->alarmActive_ = false;
+      activeInstance_->alarmMode_ = 0;
   }
   httpd_resp_set_type(request, "application/json");
   return httpd_resp_send(request,

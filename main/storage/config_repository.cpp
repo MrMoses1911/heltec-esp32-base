@@ -93,24 +93,26 @@ esp_err_t ConfigRepository::LoadSsidCode(uint16_t* code) {
 }
 
 esp_err_t ConfigRepository::SaveGeoConfig(uint16_t adjacentMm,
-    int16_t offsetMm, uint16_t alarmMinMm, uint16_t alarmMaxMm) {
+    int16_t offsetMm, uint16_t alarmMinMm, uint16_t alarmMaxMm, uint16_t alarmMode) {
   if (store_ == nullptr) return ESP_ERR_INVALID_STATE;
   esp_err_t e;
   if ((e = store_->WriteU16(kNamespace, "geo_adj", adjacentMm)) != ESP_OK) return e;
   if ((e = store_->WriteI16(kNamespace, "geo_offs", offsetMm)) != ESP_OK) return e;
   if ((e = store_->WriteU16(kNamespace, "geo_amin", alarmMinMm)) != ESP_OK) return e;
   if ((e = store_->WriteU16(kNamespace, "geo_amax", alarmMaxMm)) != ESP_OK) return e;
+  if ((e = store_->WriteU16(kNamespace, "geo_mode", alarmMode)) != ESP_OK) return e;
   return ESP_OK;
 }
 
 esp_err_t ConfigRepository::LoadGeoConfig(uint16_t* adjacentMm,
-    int16_t* offsetMm, uint16_t* alarmMinMm, uint16_t* alarmMaxMm) {
+    int16_t* offsetMm, uint16_t* alarmMinMm, uint16_t* alarmMaxMm, uint16_t* alarmMode) {
   if (store_ == nullptr) return ESP_ERR_INVALID_ARG;
   auto def = [](esp_err_t e, uint16_t* v, uint16_t d) { *v = (e == ESP_OK) ? *v : d; };
   def(store_->ReadU16(kNamespace, "geo_adj", adjacentMm), adjacentMm, 2000);
   if (store_->ReadI16(kNamespace, "geo_offs", offsetMm) != ESP_OK) *offsetMm = 0;
   def(store_->ReadU16(kNamespace, "geo_amin", alarmMinMm), alarmMinMm, 500);
   def(store_->ReadU16(kNamespace, "geo_amax", alarmMaxMm), alarmMaxMm, 1500);
+  def(store_->ReadU16(kNamespace, "geo_mode", alarmMode), alarmMode, 0);
   return ESP_OK;
 }
 
