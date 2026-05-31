@@ -1,417 +1,251 @@
-# Pulse SafeDock — Descritivo Técnico
+# Pulse SafeDock — Especificação Técnica
 
-> Versão: 1.0.0  
-> Data: 2026-05-16  
-> Plataforma: ESP-IDF 5.5.3 / ESP32-S3 / Heltec WiFi LoRa V3  
-> Projeto: `Pulse-SafeDock` (nome no CMake)
+**Versão:** 1.0.0 — FW 26.1.0.0  
+**Data:** 2026-05-31  
+**Plataforma:** ESP-IDF 5.5.3 / ESP32-S3 / Heltec WiFi LoRa V3  
 
 ---
 
 ## 1. Requisitos de Ambiente
 
-### 1.1 Windows (Host do Toolchain)
-
+### 1.1 Windows (Toolchain)
 - **ESP-IDF**: `C:\esp\v5.5.3\esp-idf\`
 - **Toolchain**: `C:\Espressif\tools\xtensa-esp-elf\esp-14.2.0_20251107\xtensa-esp-elf\bin\`
-- **Python venv**: `C:\Espressif\tools\python\v5.5.3\venv\Scripts\python.exe`
+- **Python**: `C:\Espressif\tools\python\v5.5.3\venv\Scripts\python.exe`
 - **CMake**: `C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe`
 - **Ninja**: `C:\Espressif\tools\ninja\1.12.1\ninja.EXE`
 
-### 1.2 WSL (Editor)
-
-O repositório vive em `/mnt/c/esp/Projetos/Pulse_SafeDock`.  
-Build deve ser via cmd.exe do Windows.
-
-### 1.3 Build
+### 1.2 Build
 
 ```batch
-:: Primeira vez (Windows cmd.exe)
+:: Windows (cmd.exe) — primeira vez
 C:\esp\v5.5.3\esp-idf\export.bat
 idf.py set-target esp32s3
 idf.py build
+idf.py -p COM8 flash monitor
 
-:: Builds subsequentes (WSL ou Windows)
+:: WSL — builds subsequentes
 /mnt/c/Espressif/tools/ninja/1.12.1/ninja.EXE -C build
 
-:: Para reconfigurar após alterar CMakeLists.txt
-cmd.exe /c "set PATH=C:\Espressif\tools\xtensa-esp-elf\esp-14.2.0_20251107\xtensa-esp-elf\bin;%%PATH%% && set IDF_PATH=C:\esp\v5.5.3\esp-idf && set PYTHON=C:\Espressif\tools\python\v5.5.3\venv\Scripts\python.exe && C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe -S C:\esp\Projetos\Pulse_SafeDock -B C:\esp\Projetos\Pulse_SafeDock\build -DCMAKE_TOOLCHAIN_FILE=C:\esp\v5.5.3\esp-idf\tools\cmake\toolchain-esp32s3.cmake -G Ninja"
-
-:: Flash
-idf.py -p COM8 flash monitor
+:: Reconfigurar (após CMakeLists.txt)
+cmd.exe /c "set PATH=C:\Espressif\tools\xtensa-esp-elf\esp-14.2.0_20251107\xtensa-esp-elf\bin;%PATH% && set IDF_PATH=C:\esp\v5.5.3\esp-idf && set PYTHON=C:\Espressif\tools\python\v5.5.3\venv\Scripts\python.exe && C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe -S C:\esp\Projetos\Pulse_SafeDock -B C:\esp\Projetos\Pulse_SafeDock\build -DCMAKE_TOOLCHAIN_FILE=C:\esp\v5.5.3\esp-idf\tools\cmake\toolchain-esp32s3.cmake -G Ninja"
 ```
 
 ---
 
-## 2. Configuração do Hardware
+## 2. Hardware
 
 ### 2.1 Placa: Heltec WiFi LoRa V3
 
 | Recurso | Detalhe |
 |---|---|
-| MCU | ESP32-S3 (dual-core Xtensa LX7) |
+| MCU | ESP32-S3, dual-core Xtensa LX7, 160MHz |
 | Flash | 8MB DIO 80MHz |
 | PSRAM | 8MB Octal |
 | LoRa | SX1262 (SPI) |
 | OLED | SSD1306 128x64 (I2C) |
 | Botão | GPIO 0 (BUTTON), pull-up interno |
-| LED | GPIO 35 (built-in) |
+| LED | GPIO 35 |
 
-### 2.2 Sensor: Banner Q5X Laser PFM
+### 2.2 Pinagem do Projeto
+
+| GPIO | Função | Tipo |
+|---|---|---|
+| 0 | Botão de usuário | Input, pull-up |
+| 34 | Alarme (saída) | Output |
+| 35 | LED built-in | Output |
+| 38 | Sensor PFM (entrada) | Input (PCNT) |
+| 39 | Alarme (reserva) | Output |
+
+### 2.3 Sensor: Banner Q5X (PFM)
 
 | Parâmetro | Valor |
 |---|---|
-| GPIO | 38 (entrada) |
+| GPIO | 38 |
 | Tipo | PFM (Pulse Frequency Modulation) |
-| Faixa de frequência | 90 Hz (2200 mm) a 660 Hz (40 mm) |
-| Período mínimo | 1515 µs |
-| Período máximo | 11111 µs |
-| Filtro | Rejeita saltos >200 mm |
-| Buffer | 7 períodos, saída por mediana |
-
-### 2.3 Partição (8MB)
-
-| Partição | Offset | Tamanho |
-|---|---|---|
-| nvs | 0x9000 | 128 KB |
-| otadata | 0x29000 | 8 KB |
-| phy_init | 0x2B000 | 4 KB |
-| factory | 0x30000 | 2624 KB |
-| ota_0 | 0x2C0000 | 2624 KB |
-| ota_1 | 0x550000 | 2624 KB |
-
-### 2.4 SDK Defaults (sdkconfig.defaults)
-
-- Flash: 8MB DIO 80MHz
-- Partição: custom (acima)
-- Arduino: habilitado, core 1, loop stack 8192
-- FreeRTOS tick: 1000 Hz
-- Cache: 16KB instrução + 32KB dados, 8-way, line 32B
-- Task WDT: habilitado
+| Faixa de frequência | 100-600 Hz |
+| Faixa de distância | 50-5000 mm |
+| Mapeamento | linear: 100Hz→50mm, 600Hz→5000mm |
+| Slope | 9.9 mm/Hz |
+| Filtro de glitch | 1µs (PCNT hardware) |
 
 ---
 
-## 3. Estrutura do Código
+## 3. Geometria e Alarme
 
-### 3.1 Árvore Completa
+### 3.1 Cálculo da Distância do Veículo
+
+```
+distVeículo = sqrt(max(laser² - adjacente², 0)) + offset
+```
+
+Onde:
+- `laser` = distância medida pelo sensor (hipotenusa)
+- `adjacente` = distância configurada do sensor até a doca (mm)
+- `offset` = correção configurável (+/- mm)
+- Se `adjacente = 0`: `distVeículo = laser` (medição direta, sem Pitágoras)
+
+### 3.2 Alarme
+
+- GPIO 34: HIGH = alarme ativo
+- Modo Zona: `alarme = (min ≤ distVeículo ≤ max)`
+- Modo Limite: `alarme = (distVeículo < min ∨ distVeículo > max)`
+
+---
+
+## 4. PCNT — Medição de Frequência
+
+O PCNT (Pulse Counter) periférico do ESP32-S3 conta bordas de subida no GPIO 38. Um `esp_timer` em modo TASK lê o contador a cada 80ms.
+
+```
+freqHz = deltaContagem / 0.080s
+distMm = 50 + (freqHz - 100) * 9.9
+```
+
+- **Sem ISR**: o timer executa no task context do esp_timer, não em interrupção
+- **Glitch filter**: rejeita pulsos < 1µs (configurado no PCNT)
+- **Wrap handling**: `high_limit=32767`, delta negativo recebe +32769
+
+---
+
+## 5. Estrutura do Código
 
 ```
 main/
-  CMakeLists.txt              ← Component registration (10 .cpp, REQUIRES)
-  main.cpp                    ← setup() + loop()
+  CMakeLists.txt            10 .cpp registrados
+  main.cpp                  setup() + loop()
 
-  shared/                     ← Tipos compartilhados (sem .cpp, apenas headers)
-    app_types.h               ← DeviceConfig, IoSnapshot, LoRaRuntimeStatus, enums
-    app_commands.h            ← AppCommand envelope
-    app_events.h              ← SystemEvent envelope
-    build_features.h          ← Firmware version macros
-    io_snapshot.h             ← IoSnapshot struct
+  shared/                   Tipos compartilhados (app_types, app_commands, app_events, build_features, io_snapshot)
 
-  platform/                   ← Board abstraction
-    platform_bootstrap.h      ← API (InitializeBoard, Display*, radio*)
-    platform_bootstrap.cpp    ← Implementação (heltec_unofficial.h, RadioLib, SSD1306)
+  platform/                 Abstração de placa
+    platform_bootstrap.h    API: InitializeBoard, Display*, Radio*
+    platform_bootstrap.cpp  Implementação (Heltec, SSD1306, RadioLib)
 
-  sensors/                    ← Sensor drivers
-    q5x_pfm.h                 ← Q5X_PFM class
-    q5x_pfm.cpp               ← ISR period measurement, median filter
+  sensors/                  Sensor laser
+    q5x_pfm.h/.cpp          PCNT-based frequency measurement, geometry calculation
 
-  sensors/                    ← Sensor drivers
-    q5x_pfm.h/.cpp            ← Q5X PFM (GPIO38)
-                              ← ISR on rising edge, 7-period buffer, median output
+  ui/                       OLED + Menu
+    status_view.h/.cpp      Renderização de telas
+    menu_manager.h/.cpp     Máquina de estados do menu
 
-  ui/                         ← OLED display
-    status_view.h/.cpp        ← RenderMainMenu, RenderDistanceView, RenderWebServer*, RenderFactoryResetConfirm
-    menu_manager.h/.cpp       ← Screen state machine + navigation logic
-    boot_logo.h               ← 128x64 bitmap placeholders
-    gateway_logo.h
+  storage/                  Persistência NVS
+    nvs_store.h/.cpp        Wrapper nvs_flash (Read/Write U16, I16, Blob)
+    config_repository.h/.cpp SafeDockConfig, SaveGeoConfig, LoadGeoConfig
 
-  storage/                    ← NVS persistence
-    nvs_store.h/.cpp          ← nvs_flash wrapper (Initialize, Read/Write, EraseAll)
-    config_repository.h/.cpp  ← SafeDockConfig save/load/factory-reset
+  system/                   WebServer
+    network_manager.h/.cpp  Wi-Fi AP + HTTP server + handlers
+    web_ui_texts.h          Catálogo de textos PT-BR
+    web_ui_texts/*.h        Textos (common, view, params)
 
-  system/                     ← WebServer (stub)
-    network_manager.h/.cpp    ← NetworkManager class (all methods return ESP_OK/false)
-    web_ui_texts.h            ← Web UI text catalog macro assembly
-    web_ui_texts/common.h     ← Common UI texts (PT-BR)
-    web_ui_texts/view.h       ← Monitoring page texts
-    web_ui_texts/params.h     ← Configuration page texts
-
-  comms/                      ← LoRa (stub)
-    lora_manager.h/.cpp       ← LoRaManager (queue/consume methods all return false)
-    lora_protocol.h/.cpp      ← Protocol v7 (header serializer works, payloads return false)
+  comms/                    LoRa (stub)
+    lora_manager.h/.cpp
+    lora_protocol.h/.cpp
 ```
 
-### 3.2 CMakeLists.txt (main/)
+---
 
-```cmake
-idf_component_register(SRCS "main.cpp"
-                "comms/lora_manager.cpp"
-                "comms/lora_protocol.cpp"
-                "platform/platform_bootstrap.cpp"
-                "sensors/q5x_pfm.cpp"
-                "storage/config_repository.cpp"
-                "storage/nvs_store.cpp"
-                "system/network_manager.cpp"
-                "ui/menu_manager.cpp"
-                "ui/status_view.cpp"
-                    INCLUDE_DIRS "."
-                    REQUIRES arduino esp_event esp_http_server esp_netif esp_wifi heltec_esp32_lora_v3 nvs_flash)
-```
+## 6. Namespaces
 
-Nota: `INCLUDE_DIRS "."` permite includes relativos como `#include "shared/app_types.h"`.
+| Namespace | Módulo |
+|---|---|
+| `pulse::platform` | Abstração de placa |
+| `pulse::sensors` | Sensores |
+| `pulse::shared` | Tipos compartilhados |
+| `pulse::storage` | Persistência NVS |
+| `pulse::system` | WebServer/Network |
+| `pulse::comms` | LoRa |
+| `pulse::ui` | OLED/Menu |
 
-### 3.3 Dependências (components/)
+---
 
-| Componente | Diretório | Função |
+## 7. Web Interface
+
+### 7.1 Endpoints
+
+| Método | URL | Handler | Auth |
+|---|---|---|---|
+| GET | `/` | RootHandler | Não |
+| GET | `/params` | ParametersPageHandler | Não |
+| GET | `/api/status` | StatusHandler (JSON) | Não |
+| GET | `/api/auth/status` | AuthStatusHandler | Não |
+| POST | `/api/login` | LoginHandler | Não |
+| POST | `/api/logout` | LogoutHandler | Sim |
+| POST | `/api/device/config` | DeviceConfigHandler | Sim |
+| POST | `/api/device/restart` | RestartHandler | Sim |
+| POST | `/api/device/factory-reset` | FactoryResetHandler | Sim |
+| POST | `/api/exit-ap` | ExitApHandler | Sim |
+| POST | `/api/device/ota` | OtaUploadHandler | Sim |
+
+### 7.2 Páginas
+
+**Monitor** (`/`): Doca (distância veículo + alarme) → Sensor (distância/frequência) → WiFi → Runtime
+
+**Configurações** (`/params`): Sensor (limites) → Doca/Geometria (adjacente, offset, alarme) → Rede → Sistema e Atualização (restart, factory reset, OTA)
+
+### 7.3 Auto-Save
+
+Toda alteração de campo dispara `triggerAutoSave()` → debounce 400ms → POST `/api/device/config`. Não há botão "Salvar tudo".
+
+### 7.4 Credenciais Padrão
+
+- Usuário: `admin`
+- Senha: `pulse`
+
+---
+
+## 8. Persistência NVS
+
+### 8.1 Namespace
+
+Namespace: `safedock`
+
+### 8.2 Chaves
+
+| Chave | Tipo | Conteúdo |
 |---|---|---|
-| `heltec_esp32_lora_v3` | `components/heltec_esp32_lora_v3/` | Board: OLED, botão, LED, SX1262 |
-| `arduino` | `components/arduino/` | Arduino framework (ESP32 core) |
-| `RadioLib` | `components/RadioLib/` | SX1262 driver |
-| `esp8266-oled-ssd1306` | `components/esp8266-oled-ssd1306/` | OLED via I2C |
-| `HotButton` | `components/HotButton/` | Botão com debounce |
+| `config` | Blob | PersistedConfig: magic, schemaVersion, freqMin/Max Hz, distance Min/Max mm, sensorGpio, webUsername, webPassword, apSsid, apPassword, webServerAlwaysOn, webServerTimeoutMinutes |
+| `ssid_code` | u16 | Código do SSID para always-on |
+| `geo_adj` | u16 | Distância sensor→doca (mm) |
+| `geo_offs` | i16 | Offset de correção |
+| `geo_amin` | u16 | Alarme mínimo |
+| `geo_amax` | u16 | Alarme máximo |
+| `geo_mode` | u16 | Modo de alarme (0=zona, 1=limite) |
 
 ---
-
-## 4. Namespaces e APIs
-
-### 4.1 `pulse::platform` — Abstração de Placa
-
-```cpp
-void InitializeBoard();                                    // Serial, HSPI, OLED init
-void PollBoard();                                          // heltec_loop()
-void BlinkConfirmationLed();                                // 3x pisca LED
-
-bool IsButtonPressed();                                    // Leitura direta do GPIO
-bool ConsumeButtonSingleClick();                           // HotButton.isSingleClick()
-bool ConsumeButtonLongPress(uint32_t durationMs);          // HotButton.pressedFor(ms)
-
-// OLED
-void DisplayClear();
-void DisplaySetFontNormal();                               // ArialMT_Plain_10
-void DisplaySetFontLarge();                                // ArialMT_Plain_16
-void DisplayDrawText(int16_t x, int16_t y, const char* text);
-int16_t DisplayMeasureTextWidth(const char* text);
-void DisplayDrawImage(int16_t x, int16_t y, int16_t width, int16_t height, const uint8_t* image);
-void DisplayPresent();
-
-// LoRa Radio
-int InitializeRadio();
-int ConfigureRadio(float freqMhz, float bwKhz, uint8_t sf, int8_t powerDbm);
-void SetRadioReceiveAction(void (*func)(void));
-void ClearRadioReceiveAction();
-int StartRadioReceive();
-int TransmitRadio(const uint8_t* data, size_t length);
-size_t GetRadioPacketLength();
-int ReadRadioData(uint8_t* data, size_t length);
-float GetRadioRssi();
-float GetRadioSnr();
-```
-
-### 4.2 `pulse::sensors` — Q5X PFM
-
-```cpp
-class Q5X_PFM {
-  void init(uint8_t gpio = 38);
-  void update();                      // Call every loop iteration
-  float getFrequencyHz();             // Current frequency
-  float getDistanceMm();              // Converted distance
-  enum Status { kOk, kNoSignal, kInvalid, kNotInitialized };
-  Status getStatus();
-
-  // Constants
-  static constexpr float kFreqMinHz = 90.0f;
-  static constexpr float kFreqMaxHz = 660.0f;
-  static constexpr float kDistanceMinMm = 40.0f;
-  static constexpr float kDistanceMaxMm = 2200.0f;
-};
-```
-
-### 4.3 `pulse::storage` — Persistência
-
-```cpp
-// NvsStore — raw NVS wrapper
-class NvsStore {
-  esp_err_t Initialize();
-  esp_err_t ReadU16(const char* ns, const char* key, uint16_t* v) const;
-  esp_err_t WriteU16(const char* ns, const char* key, uint16_t v) const;
-  esp_err_t ReadBlob(const char* ns, const char* key, void* v, size_t sz) const;
-  esp_err_t WriteBlob(const char* ns, const char* key, const void* v, size_t sz) const;
-  esp_err_t EraseAll();
-};
-
-// SafeDockConfig — persisted settings
-struct SafeDockConfig {
-  uint16_t schemaVersion = 1;
-  uint16_t freqMinHz = 90;
-  uint16_t freqMaxHz = 660;
-  uint16_t distanceMinMm = 40;
-  uint16_t distanceMaxMm = 2200;
-  uint16_t sensorGpio = 38;
-  char webUsername[16] = "admin";
-  char webPassword[16] = "pulse";
-  char apSsid[33] = {};
-  char apPassword[64] = {};
-  uint16_t webServerAlwaysOn = 0;
-  uint16_t webServerTimeoutMinutes = 15;
-};
-
-// ConfigRepository — save/load/factory-reset
-class ConfigRepository {
-  explicit ConfigRepository(NvsStore* store);
-  esp_err_t Load(SafeDockConfig* config);
-  esp_err_t Save(const SafeDockConfig& config);
-  esp_err_t FactoryReset();  // nvs_flash_erase()
-};
-```
-
-### 4.4 `pulse::ui` — Menu OLED
-
-```cpp
-// Screen IDs
-enum class Screen : uint8_t {
-  kMainMenu, kDistanceView, kWebServerMenu,
-  kWebMonitor, kWebRuntime, kWebSystem, kWebSensor,
-  kFactoryResetConfirm
-};
-
-// MenuManager — state machine + navigation
-class MenuManager {
-  void Reset();
-  void HandleButtonClick();          // Avança seleção
-  void HandleButtonLongPress();      // Confirma/volta
-  Screen CurrentScreen() const;
-  uint8_t CurrentSelection() const;
-  void SetConfig(const SafeDockConfig& config);
-  void SetDistanceReading(float mm, float hz, bool valid);
-  void SetWebServerState(...);
-  void SetRuntimeData(uint16_t alias, uint32_t uptimeMin, uint16_t rx, uint16_t tx);
-  bool IsFactoryResetConfirmed() const;
-};
-
-// Display renderers (status_view.h)
-void RenderStatus(const MenuManager& manager);     // Dispatch central
-void ShowBootLogo();
-void ShowFatalError(esp_err_t err);
-```
-
-### 4.5 `pulse::system` — WebServer (Stub)
-
-```cpp
-class NetworkManager {
-  esp_err_t Initialize(QueueHandle_t eventQueue, const DeviceConfig& config);
-  esp_err_t SetApModeEnabled(bool enabled);
-  bool QueueCommand(const AppCommand& cmd);
-  bool ConsumeCommand(AppCommand* cmd);
-  void UpdateSnapshot(SystemState st, const DeviceConfig& cfg, const IoSnapshot& io, const LoRaRuntimeStatus& lora);
-  uint32_t LastHeartbeatMillis() const;
-  // +20 HTTP handlers (static), all stubs returning 501
-  // All implementation methods return ESP_OK / false
-};
-```
-
-### 4.6 `pulse::comms` — LoRa (Stub)
-
-```cpp
-// lora_protocol: 10 message types, all payload structs, serializers/deserializers
-// lora_manager: queue/consume pattern for 9 frame types
-class LoRaManager {
-  esp_err_t Initialize(QueueHandle_t eventQueue, const DeviceConfig& config);
-  bool QueueBasicTelemetry(const BasicTelemetryPayload& p, uint16_t dest = kLoRaBroadcastAlias);
-  bool QueueOutputCommand(...);
-  // +7 Queue methods
-  bool ConsumeTelemetry(ReceivedTelemetryFrame* f);
-  // +8 Consume methods
-  bool GetRuntimeStatus(LoRaRuntimeStatus* status) const;
-  // All actual implementations return false / ESP_OK (stubs)
-};
-```
-
----
-
-## 5. Menu Navigation State Machine
-
-### 5.1 Telas
-
-```
-┌──────────────────────────┐
-│       Main Menu          │
-│  > Distancia Laser       │── long press ──► kDistanceView
-│    Webserver             │── long press ──► kWebServerMenu
-│    Reset de Fabrica      │── long press ──► kFactoryResetConfirm
-└──────────────────────────┘
-
-┌──────────────────────────┐
-│    WebServer Menu        │
-│  > Monitor               │── long press ──► kWebMonitor
-│    Runtime               │── long press ──► kWebRuntime
-│    Sistema               │── long press ──► kWebSystem
-│    Sensor                │── long press ──► kWebSensor
-└──────────────────────────┘
-
-┌──────────────────────────┐
-│  Reset de Fabrica        │
-│  > Confirmar             │── long press ──► nvs_flash_erase + restart
-│    Cancelar              │── long press ──► volta MainMenu
-└──────────────────────────┘
-```
-
-### 5.2 Regras de Botão
-
-- **Click simples**: `g_menu.HandleButtonClick()` → incrementa `selection_` (wrap-around)
-- **Long press (2s)**: `g_menu.HandleButtonLongPress()` → navega entre telas ou confirma
-- **Telas de exibição** (kDistanceView, kWebMonitor, kWebRuntime): long press volta ao menu pai
-- **Telas de configuração** (kWebSystem, kWebSensor): long press volta ao WebServerMenu
-
----
-
-## 6. Persistência NVS
-
-### 6.1 Namespace
-
-Toda config usa o namespace `"safedock"` no NVS.
-
-### 6.2 Blob de Config
-
-- Chave: `"config"`
-- Struct binária com magic `0x53444643` ("SDFC")
-- Schema version: 1
-
-### 6.3 Factory Reset
-
-```
-ConfigRepository::FactoryReset()
-  → nvs_store_.EraseAll()    // nvs_flash_erase()
-  → main.cpp detecta e chama ESP.restart()
-  → Na reinicialização, Load() retorna ESP_ERR_NVS_NOT_FOUND → defaults aplicados
-```
-
----
-
-## 7. Dependências ESP-IDF
-
-```
-REQUIRES: arduino, esp_event, esp_http_server, esp_netif, esp_wifi,
-          heltec_esp32_lora_v3, nvs_flash
-```
-
-## 8. Portas e Pinagem
-
-| GPIO | Função | Nota |
-|---|---|---|
-| 0 | BUTTON | Pull-up interno, active low |
-| 35 | LED | Built-in |
-| 38 | SENSOR_IN | Q5X PFM input, channel 8 |
-| SPI (HSPI) | SX1262 | SCK, MISO, MOSI, SS via `heltec_unofficial.h` |
-| I2C | SSD1306 | Via `heltec_unofficial.h` |
 
 ## 9. Firmware Version
 
-Definido em `main/shared/build_features.h`:
+Macros em `main/shared/build_features.h`:
 
-| Macro | Padrão |
+| Macro | Valor |
 |---|---|
 | PULSE_FW_VERSION_YEAR | 26 |
 | PULSE_FW_VERSION_MAJOR | 1 |
 | PULSE_FW_VERSION_MINOR | 0 |
 | PULSE_FW_VERSION_PATCH | 0 |
 
-Resultado: `"PR: 26.1.0.0"` via `pulse::shared::kFirmwareVersionLabel`.
+`PR: 26.1.0.0` via `pulse::shared::kFirmwareVersionLabel`
+
+---
+
+## 10. Build Features
+
+Flag em `main/shared/build_features.h`:
+
+| Macro | Default | Efeito |
+|---|---|---|
+| `PULSE_FEATURE_SENSOR_FILTER` | 1 | 1 = mediana+MAD+EMA; 0 = leitura crua |
+| `PULSE_FEATURE_IO_MIRROR_REMOTE_DO_PLUS` | 0 | (reservado) |
+| `PULSE_FEATURE_OTA_RELEASE_POLICY_STRICT` | 0 | (reservado) |
+
+---
+
+## 11. Dependências (components/)
+
+| Componente | Função |
+|---|---|
+| `heltec_esp32_lora_v3` | Placa: OLED, botão, LED, SX1262 |
+| `arduino` | Arduino framework |
+| `RadioLib` | Driver SX1262 |
+| `esp8266-oled-ssd1306` | OLED via I2C |
+| `HotButton` | Botão com debounce |

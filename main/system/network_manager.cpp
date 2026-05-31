@@ -487,18 +487,6 @@ R"html(
     <div class='banner' id='authSummary' data-text='view.authLoggedOut'>Modo visualizacao.</div>
 
     <div class='stack'>
-      <section class='card'>
-        <h2 data-text='view.wifiTitle'>WiFi e Webserver</h2>
-        <div class='grid'>
-          <div class='tile'><span data-text='view.wifiState'>Estado do AP</span><strong id='wifiApState'>--</strong></div>
-          <div class='tile'><span data-text='view.wifiAlwaysOn'>Webserver sempre ligado</span><strong id='wifiAlwaysOn'>--</strong></div>
-          <div class='tile'><span data-text='view.wifiRemaining'>Tempo restante do AP</span><strong id='wifiRemaining'>--</strong></div>
-          <div class='tile'><span data-text='view.wifiSsid'>SSID</span><strong id='wifiSsid' class='mono'>--</strong></div>
-          <div class='tile'><span data-text='view.wifiIp'>IP local</span><strong id='wifiIp' class='mono'>--</strong></div>
-          <div class='tile'><span data-text='view.wifiStations'>Clientes conectados</span><strong id='wifiStations'>--</strong></div>
-        </div>
-      </section>
-
       <section class='card' id='vehicleSection'>
         <h2 style='color:var(--red);'>Doca</h2>
         <div style='text-align:center;padding:16px;'>
@@ -521,6 +509,18 @@ R"html(
             <strong><span class='sensor-value' id='sensorFrequency'>--</span> <span class='sensor-unit'>Hz</span></strong>
             <small>Limites <span id='sensorLimits'>--</span></small>
           </div>
+        </div>
+      </section>
+
+      <section class='card'>
+        <h2 data-text='view.wifiTitle'>WiFi e Webserver</h2>
+        <div class='grid'>
+          <div class='tile'><span data-text='view.wifiState'>Estado do AP</span><strong id='wifiApState'>--</strong></div>
+          <div class='tile'><span data-text='view.wifiAlwaysOn'>Webserver sempre ligado</span><strong id='wifiAlwaysOn'>--</strong></div>
+          <div class='tile'><span data-text='view.wifiRemaining'>Tempo restante do AP</span><strong id='wifiRemaining'>--</strong></div>
+          <div class='tile'><span data-text='view.wifiSsid'>SSID</span><strong id='wifiSsid' class='mono'>--</strong></div>
+          <div class='tile'><span data-text='view.wifiIp'>IP local</span><strong id='wifiIp' class='mono'>--</strong></div>
+          <div class='tile'><span data-text='view.wifiStations'>Clientes conectados</span><strong id='wifiStations'>--</strong></div>
         </div>
       </section>
 
@@ -783,7 +783,7 @@ R"html(
       <details class='section'>
         <summary class='section-toggle'>
           <div class='section-heading'>
-            <h2 data-text='params.maintenanceTitle'>Sistema e Diagnóstico</h2>
+            <h2 data-text='params.maintenanceTitle'>Sistema e Atualização</h2>
             <p data-text='params.maintenanceDescription'>Reinicie, restaure padrões de fábrica ou atualize o firmware.</p>
           </div>
         </summary>

@@ -26,7 +26,7 @@
       pairingGroupDescription: 'Crie, entre ou compartilhe o grupo.',
       ioTitle: 'IO Local',
       ioDescription: 'Ajuste o comportamento de cada canal local.',
-      maintenanceTitle: 'Sistema e Diagnóstico',
+      maintenanceTitle: 'Sistema e Atualização',
       maintenanceDescription: 'Reinicie, restaure padrões de fábrica ou atualize o firmware.',
       saveSuccess: 'Configurações salvas com sucesso.',
       saveGeneralError: 'Não foi possível salvar as configurações.',
