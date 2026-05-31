@@ -1,5 +1,6 @@
 #include "storage/nvs_store.h"
 #include "nvs_flash.h"
+#include <cstring>
 
 namespace pulse {
 namespace storage {
@@ -57,10 +58,17 @@ esp_err_t NvsStore::ReadBlob(const char* nameSpace, const char* key, void* value
   nvs_handle_t handle = 0;
   esp_err_t err = Open(nameSpace, NVS_READONLY, &handle);
   if (err != ESP_OK) return err;
-  size_t actual = valueSize;
+
+  size_t actual = 0;
+  err = nvs_get_blob(handle, key, nullptr, &actual);
+  if (err == ESP_ERR_NVS_NOT_FOUND) { nvs_close(handle); return err; }
+  if (err != ESP_OK) { nvs_close(handle); return err; }
+
+  if (actual > valueSize) { nvs_close(handle); return ESP_ERR_INVALID_SIZE; }
+
+  std::memset(value, 0, valueSize);
   err = nvs_get_blob(handle, key, value, &actual);
   nvs_close(handle);
-  if (err == ESP_OK && actual != valueSize) return ESP_ERR_INVALID_SIZE;
   return err;
 }
 

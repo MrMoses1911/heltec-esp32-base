@@ -21,13 +21,13 @@ struct SafeDockConfig {
   int16_t offsetMm = 0;              // correção +/- mm
   uint16_t alarmMinMm = 500;         // zona de alarme min (mm)
   uint16_t alarmMaxMm = 1500;        // zona de alarme max (mm)
-  uint16_t alarmGpio = 39;           // GPIO do alarme
+  uint16_t alarmGpio = 34;           // GPIO do alarme
   uint16_t alarmMode = 0;            // 0=zona (min≤X≤max), 1=limite (X<min ∨ X>max)
   char webUsername[16] = {'a', 'd', 'm', 'i', 'n', '\0'};
   char webPassword[16] = {'p', 'u', 'l', 's', 'e', '\0'};
   char apSsid[33] = {};
   char apPassword[64] = {};
-  uint16_t webServerAlwaysOn = 0;
+  uint16_t webServerAlwaysOn = 1;
   uint16_t webServerTimeoutMinutes = 15;
 };
 

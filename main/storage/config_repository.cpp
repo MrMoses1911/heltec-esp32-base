@@ -1,6 +1,9 @@
 #include "storage/config_repository.h"
 #include <cstdlib>
 #include <cstring>
+#include "esp_log.h"
+
+static constexpr char kLogTag[] = "ConfigRepo";
 
 namespace pulse {
 namespace storage {
@@ -17,7 +20,7 @@ struct PersistedConfig {
   char webPassword[16] = {'p', 'u', 'l', 's', 'e', '\0'};
   char apSsid[33] = {};
   char apPassword[64] = {};
-  uint16_t webServerAlwaysOn = 0;
+  uint16_t webServerAlwaysOn = 1;
   uint16_t webServerTimeoutMinutes = 15;
 };
 
@@ -31,9 +34,14 @@ esp_err_t ConfigRepository::Load(SafeDockConfig* config) {
 
   if (err == ESP_ERR_NVS_NOT_FOUND) {
     *config = SafeDockConfig{};
+    ESP_LOGI(kLogTag, "NVS vazio, usando defaults");
     return ESP_OK;
   }
-  if (err != ESP_OK) return err;
+  if (err != ESP_OK) {
+    ESP_LOGW(kLogTag, "Leitura NVS falhou: %s, usando defaults", esp_err_to_name(err));
+    *config = SafeDockConfig{};
+    return ESP_OK;  // não propaga erro — fallback seguro
+  }
   if (record.magic != kMagic) {
     *config = SafeDockConfig{};
     return ESP_OK;
@@ -52,6 +60,8 @@ esp_err_t ConfigRepository::Load(SafeDockConfig* config) {
   config->webServerAlwaysOn = record.webServerAlwaysOn;
   config->webServerTimeoutMinutes = record.webServerTimeoutMinutes;
 
+  ESP_LOGI(kLogTag, "Config carregada: ssid='%.*s' alwaysOn=%u",
+           (int)sizeof(config->apSsid), config->apSsid, config->webServerAlwaysOn);
   return ESP_OK;
 }
 

@@ -11,8 +11,6 @@
 #include "driver/gpio.h"
 #include <math.h>
 
-void run_all_tests(void);
-
 using namespace pulse::ui;
 
 Q5X_PFM g_sensor;
@@ -27,11 +25,6 @@ static unsigned long g_lastRenderMs = 0;
 static unsigned long g_lastUptimeSecond = 0;
 static uint32_t g_uptimeMinutes = 0;
 static bool g_webServerActive = false;
-static uint16_t g_adjacentMm = 2000;
-static int16_t g_offsetMm = 0;
-static uint16_t g_alarmMinMm = 500;
-static uint16_t g_alarmMaxMm = 1500;
-static uint16_t g_alarmMode = 0;
 
 void TryFactoryReset() {
   Serial.println("Executando factory reset...");
@@ -57,12 +50,6 @@ static pulse::shared::DeviceConfig MakeDeviceConfig(const pulse::storage::SafeDo
 void setup() {
   Serial.begin(115200);
   esp_log_level_set("*", ESP_LOG_INFO);
-
-  // Run unit tests at boot
-  Serial.println("\n\n=== Iniciando Testes Unitarios ===");
-  run_all_tests();
-  Serial.println("=== Testes Concluidos ===\n");
-
   pulse::platform::InitializeBoard();
 
   g_nvs.Initialize();
@@ -78,10 +65,10 @@ void setup() {
     config.distanceMinMm, config.distanceMaxMm);
 
   // ── Load geometry config and setup alarm GPIO ────────────
-  g_configRepo.LoadGeoConfig(&g_adjacentMm, &g_offsetMm,
-                             &g_alarmMinMm, &g_alarmMaxMm, &g_alarmMode);
-  g_networkManager.UpdateGeometryData(0, 0, g_adjacentMm, g_offsetMm,
-    g_alarmMinMm, g_alarmMaxMm, g_alarmMode, false);
+  uint16_t adj, alMin, alMax, alMode;
+  int16_t off;
+  g_configRepo.LoadGeoConfig(&adj, &off, &alMin, &alMax, &alMode);
+  g_networkManager.UpdateGeometryData(0, 0, adj, off, alMin, alMax, alMode, false);
 
   gpio_config_t alarmCfg = {};
   alarmCfg.pin_bit_mask = 1ULL << config.alarmGpio;
@@ -164,30 +151,34 @@ void loop() {
   float freq = g_sensor.getFrequencyHz();
   bool valid = (g_sensor.getStatus() == Q5X_PFM::kOk);
   float vehicleDist = 0;
+  uint16_t adjMm = g_networkManager.GetAdjacentMm();
+  int16_t offMm  = g_networkManager.GetOffsetMm();
+  uint16_t alMin = g_networkManager.GetAlarmMinMm();
+  uint16_t alMax = g_networkManager.GetAlarmMaxMm();
+  uint16_t alMode = g_networkManager.GetAlarmMode();
 
-  if (valid && g_adjacentMm > 0) {
+  if (valid && adjMm > 0) {
     float h2 = rawDist * rawDist;
-    float a2 = static_cast<float>(g_adjacentMm) * g_adjacentMm;
+    float a2 = static_cast<float>(adjMm) * adjMm;
     if (h2 > a2) {
       vehicleDist = sqrtf(h2 - a2);
     } else {
       vehicleDist = 0;
     }
   } else {
-    // adjacentMm=0: direct measurement, no Pythagoras
     vehicleDist = valid ? rawDist : 0;
   }
+  vehicleDist += static_cast<float>(offMm);
   if (vehicleDist < 0) vehicleDist = 0;
 
-  bool alarmActive = (g_alarmMode == 0)
-    ? (vehicleDist >= g_alarmMinMm && vehicleDist <= g_alarmMaxMm)   // zona
-    : (vehicleDist < g_alarmMinMm || vehicleDist > g_alarmMaxMm);   // limite
-  gpio_set_level(static_cast<gpio_num_t>(39), alarmActive ? 1 : 0);
+  bool alarmActive = (alMode == 0)
+    ? (vehicleDist >= alMin && vehicleDist <= alMax)
+    : (vehicleDist < alMin || vehicleDist > alMax);
+  gpio_set_level(static_cast<gpio_num_t>(34), alarmActive ? 1 : 0);
 
   if (g_webServerActive) {
     g_networkManager.UpdateSensorData(rawDist, freq, valid);
-    g_networkManager.UpdateGeometryData(vehicleDist, rawDist,
-      g_adjacentMm, g_offsetMm, g_alarmMinMm, g_alarmMaxMm, g_alarmMode, alarmActive);
+    g_networkManager.UpdateRuntimeData(vehicleDist, rawDist, alarmActive);
   }
 
   if (now - g_lastUptimeSecond >= 60000) {

@@ -12,6 +12,8 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
 #include "esp_random.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
@@ -326,6 +328,21 @@ void NetworkManager::UpdateSensorData(float distanceMm, float freqHz, bool valid
   sensorValid_ = valid;
 }
 
+void NetworkManager::UpdateGeoConfig(uint16_t adjacentMm, int16_t offsetMm,
+    uint16_t alarmMinMm, uint16_t alarmMaxMm, uint16_t alarmMode) {
+  adjacentMm_ = adjacentMm;
+  offsetMm_ = offsetMm;
+  alarmMinMm_ = alarmMinMm;
+  alarmMaxMm_ = alarmMaxMm;
+  alarmMode_ = alarmMode;
+}
+
+void NetworkManager::UpdateRuntimeData(float vehicleDistanceMm, float hypotenuseMm, bool alarmActive) {
+  vehicleDistanceMm_ = vehicleDistanceMm;
+  hypotenuseMm_ = hypotenuseMm;
+  alarmActive_ = alarmActive;
+}
+
 void NetworkManager::UpdateSensorLimits(uint16_t freqMin, uint16_t freqMax, uint16_t distMin, uint16_t distMax) {
   sensorFreqMinHz_ = freqMin;
   sensorFreqMaxHz_ = freqMax;
@@ -482,28 +499,28 @@ R"html(
         </div>
       </section>
 
+      <section class='card' id='vehicleSection'>
+        <h2 style='color:var(--red);'>Doca</h2>
+        <div style='text-align:center;padding:16px;'>
+          <div style='font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;'>Distância do veículo</div>
+          <div style='font-size:2.2rem;font-weight:700;color:#fff;margin:8px 0;'><span id='vehicleDistance'>--</span> <span style='font-size:1rem;color:var(--muted);'>mm</span></div>
+          <div><span id='alarmState' class='status-chip'>--</span> <small style='color:var(--muted);' id='alarmModeLabel'></small></div>
+        </div>
+      </section>
+
       <section class='card'>
         <h2>Sensor</h2>
         <div class='grid'>
           <div class='tile'>
-            <span>Distancia</span>
+            <span>Distância</span>
             <strong><span class='sensor-value' id='sensorDistance'>--</span> <span class='sensor-unit'>mm</span></strong>
             <small>Validade <span id='sensorValid' class='status-chip'>--</span></small>
           </div>
           <div class='tile'>
-            <span>Frequencia</span>
+            <span>Frequência</span>
             <strong><span class='sensor-value' id='sensorFrequency'>--</span> <span class='sensor-unit'>Hz</span></strong>
             <small>Limites <span id='sensorLimits'>--</span></small>
           </div>
-        </div>
-      </section>
-
-      <section class='card' id='vehicleSection'>
-        <h2 style='color:var(--red);'>Doca</h2>
-        <div style='text-align:center;padding:16px;'>
-          <div style='font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;'>Distancia do veiculo</div>
-          <div style='font-size:2.2rem;font-weight:700;color:#fff;margin:8px 0;'><span id='vehicleDistance'>--</span> <span style='font-size:1rem;color:var(--muted);'>mm</span></div>
-          <div><span id='alarmState' class='status-chip'>--</span> <small style='color:var(--muted);' id='alarmModeLabel'></small></div>
         </div>
       </section>
 
@@ -512,7 +529,7 @@ R"html(
         <div class='grid'>
           <div class='tile'><span data-text='view.runState'>Estado do sistema</span><strong id='runState'>--</strong></div>
           <div class='tile'><span data-text='view.runAlias'>Alias</span><strong id='runAlias'>--</strong></div>
-          <div class='tile'><span data-text='view.runSoftwareVersion'>Versao de software</span><strong id='runSoftwareVersion'>--</strong></div>
+          <div class='tile'><span data-text='view.runSoftwareVersion'>Versão de software</span><strong id='runSoftwareVersion'>--</strong></div>
           <div class='tile'><span>Uptime</span><strong id='runUptime'>--</strong></div>
         </div>
       </section>
@@ -685,7 +702,7 @@ R"html(
     <header class='topbar'>
       <div>
         <h1><span class='brand-pulse'>PULSE</span> SafeDock</h1>
-        <h2 class='subtitle' data-text='params.subtitle'>Configuracoes do gateway</h2>
+        <h2 class='subtitle' data-text='params.subtitle'>Configurações do Sistema</h2>
       </div>
       <div class='actions'>
         <button id='loginBtn' onclick='promptLogin()' data-text='common.buttons.login'>Login</button>
@@ -707,15 +724,15 @@ R"html(
         <summary class='section-toggle'>
           <div class='section-heading'>
             <h2>Limites do Sensor</h2>
-            <p>Defina os limites de operacao do sensor de distancia e frequencia.</p>
+            <p>Defina os limites de operação do sensor de distância e frequência.</p>
           </div>
         </summary>
         <div class='section-body'>
           <div class='grid'>
-            <label><span>Frequencia minima Hz</span><input id='freqMinHz' type='number' min='1' max='10000' value='100' onchange='triggerAutoSave()'></label>
-            <label><span>Frequencia maxima Hz</span><input id='freqMaxHz' type='number' min='1' max='10000' value='600' onchange='triggerAutoSave()'></label>
-            <label><span>Distancia minima mm</span><input id='distanceMinMm' type='number' min='1' max='10000' value='50' onchange='triggerAutoSave()'></label>
-            <label><span>Distancia maxima mm</span><input id='distanceMaxMm' type='number' min='1' max='10000' value='5000' onchange='triggerAutoSave()'></label>
+            <label><span>Frequência mínima Hz</span><input id='freqMinHz' type='number' min='1' max='10000' value='100' onchange='triggerAutoSave()'></label>
+            <label><span>Frequência máxima Hz</span><input id='freqMaxHz' type='number' min='1' max='10000' value='600' onchange='triggerAutoSave()'></label>
+            <label><span>Distância mínima mm</span><input id='distanceMinMm' type='number' min='1' max='10000' value='50' onchange='triggerAutoSave()'></label>
+            <label><span>Distância máxima mm</span><input id='distanceMaxMm' type='number' min='1' max='10000' value='5000' onchange='triggerAutoSave()'></label>
           </div>
         </div>
       </details>
@@ -724,7 +741,7 @@ R"html(
         <summary class='section-toggle'>
           <div class='section-heading'>
             <h2>Doca — Geometria</h2>
-            <p>Configure a distancia do sensor ate a doca e os limites de alarme.</p>
+            <p>Configure a distância do sensor até a doca e os limites de alarme.</p>
           </div>
         </summary>
         <div class='section-body'>
@@ -733,10 +750,10 @@ R"html(
               <option value='0'>Zona (alarme quando DENTRO)</option>
               <option value='1'>Limite (alarme quando FORA)</option>
             </select></label>
-            <label><span>Dist. sensor → doca (mm)</span><input id='adjacentMm' type='number' min='100' max='50000' value='2000' onchange='triggerAutoSave()'></label>
+            <label><span>Dist. sensor → doca (mm)</span><input id='adjacentMm' type='number' min='0' max='50000' value='2000' onchange='triggerAutoSave()'></label>
             <label><span>Offset +/- (mm)</span><input id='offsetMm' type='number' min='-5000' max='5000' value='0' onchange='triggerAutoSave()'></label>
-            <label><span>Alarme minimo (mm)</span><input id='alarmMinMm' type='number' min='0' max='50000' value='500' onchange='triggerAutoSave()'></label>
-            <label><span>Alarme maximo (mm)</span><input id='alarmMaxMm' type='number' min='0' max='50000' value='1500' onchange='triggerAutoSave()'></label>
+            <label><span>Alarme mínimo (mm)</span><input id='alarmMinMm' type='number' min='0' max='50000' value='500' onchange='triggerAutoSave()'></label>
+            <label><span>Alarme máximo (mm)</span><input id='alarmMaxMm' type='number' min='0' max='50000' value='1500' onchange='triggerAutoSave()'></label>
           </div>
         </div>
       </details>
@@ -766,8 +783,8 @@ R"html(
       <details class='section'>
         <summary class='section-toggle'>
           <div class='section-heading'>
-            <h2 data-text='params.maintenanceTitle'>Persistencia e Manutencao</h2>
-            <p data-text='params.maintenanceDescription'>Salve alteracoes e execute comandos.</p>
+            <h2 data-text='params.maintenanceTitle'>Sistema e Diagnóstico</h2>
+            <p data-text='params.maintenanceDescription'>Reinicie, restaure padrões de fábrica ou atualize o firmware.</p>
           </div>
         </summary>
         <div class='section-body'>
@@ -775,6 +792,13 @@ R"html(
             <button class='warn' onclick='restartDevice()' data-text='common.buttons.restart'>Reiniciar</button>
             <button class='warn' onclick='factoryResetDevice()' data-text='common.buttons.factoryReset'>Reset de fabrica</button>
             <button class='secondary' onclick='exitAp()' data-text='common.buttons.exitAp'>Encerrar AP</button>
+          </div>
+          <hr style='border-color:var(--line);margin:16px 0;'>
+          <div>
+            <p style='color:var(--muted);margin-bottom:8px;'>Atualização OTA</p>
+            <input id='otaFileInput' type='file' accept='.bin' style='color:var(--text);margin-bottom:8px;'>
+            <button onclick='uploadOta()' data-text='params.buttons.otaUpload'>Atualizar firmware OTA</button>
+            <p style='color:var(--muted);font-size:.8rem;margin-top:8px;'>Selecione o arquivo .bin e clique em "Atualizar". O gateway sera reiniciado apos a atualizacao.</p>
           </div>
         </div>
       </details>
@@ -898,6 +922,29 @@ R"html(
       if(window.confirm(t('common.alerts.factoryResetConfirm','Confirma reset de fabrica?'))){await guardedPost('/api/device/factory-reset','')}
     }
 
+    async function uploadOta(){
+      const fileInput=document.getElementById('otaFileInput')
+      if(!fileInput.files||fileInput.files.length===0){window.alert('Selecione um arquivo .bin primeiro.');return}
+      const file=fileInput.files[0]
+      if(!window.confirm('Confirma enviar o firmware OTA? O gateway sera reiniciado ao final.'))return
+      const formData=new FormData()
+      formData.append('firmware',file)
+      try{
+        const response=await fetch('/api/device/ota',{method:'POST',body:formData})
+        if(response.ok){
+          const result=await response.json()
+          window.alert(result.message||'Firmware enviado. Reiniciando...')
+        }else if(response.status===401){
+          window.alert('Login necessario.')
+        }else{
+          const result=await response.json()
+          window.alert('Falha no OTA: '+(result.error||'Erro desconhecido'))
+        }
+      }catch(e){
+        window.alert('Falha na conexao: '+e.message)
+      }
+    }
+
     async function exitAp(){
       if(window.confirm(t('common.alerts.exitApConfirm','Confirma encerrar AP?'))){await guardedPost('/api/exit-ap','')}
     }
@@ -915,11 +962,11 @@ R"html(
         document.getElementById('freqMaxHz').value=String(latestData.freq_max_hz||600)
         document.getElementById('distanceMinMm').value=String(latestData.distance_min_mm||50)
         document.getElementById('distanceMaxMm').value=String(latestData.distance_max_mm||5000)
-        document.getElementById('adjacentMm').value=String(latestData.adjacent_mm||2000)
-        document.getElementById('offsetMm').value=String(latestData.offset_mm||0)
-        document.getElementById('alarmMinMm').value=String(latestData.alarm_min_mm||500)
-        document.getElementById('alarmMaxMm').value=String(latestData.alarm_max_mm||1500)
-        document.getElementById('alarmMode').value=String(latestData.alarm_mode||0)
+        document.getElementById('adjacentMm').value=String(latestData.adjacent_mm!==undefined?latestData.adjacent_mm:2000)
+        document.getElementById('offsetMm').value=String(latestData.offset_mm!==undefined?latestData.offset_mm:0)
+        document.getElementById('alarmMinMm').value=String(latestData.alarm_min_mm!==undefined?latestData.alarm_min_mm:500)
+        document.getElementById('alarmMaxMm').value=String(latestData.alarm_max_mm!==undefined?latestData.alarm_max_mm:1500)
+        document.getElementById('alarmMode').value=String(latestData.alarm_mode!==undefined?latestData.alarm_mode:0)
         document.getElementById('webAlwaysOn').value=String(latestData.web_server_always_on||0)
         document.getElementById('webTimeoutMinutes').value=String(latestData.web_server_timeout_minutes||15)
         document.getElementById('fixedApSsid').value=latestData.configured_ssid||''
@@ -1301,9 +1348,11 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
   // Parse geometry and alarm fields
   uint16_t adjMm = activeInstance_->adjacentMm_;
   int16_t offMm = activeInstance_->offsetMm_;
-  uint16_t alMin = 500, alMax = 1500, alMode = 0;
+  uint16_t alMin = activeInstance_->alarmMinMm_;
+  uint16_t alMax = activeInstance_->alarmMaxMm_;
+  uint16_t alMode = activeInstance_->alarmMode_;
   if (activeInstance_->ExtractFormValue(formData, "adjacent_mm", &value)) {
-    adjMm = ClampU16(value, 100, 50000);
+    adjMm = ClampU16(value, 0, 50000);
     configChanged = true;
   }
   if (activeInstance_->ExtractFormValue(formData, "offset_mm", &value)) {
@@ -1321,6 +1370,9 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
   if (activeInstance_->ExtractFormValue(formData, "alarm_mode", &value)) {
     alMode = (value > 0) ? 1 : 0;
     configChanged = true;
+    ESP_LOGI(kLogTag, "alarm_mode parsed: raw=%u → mode=%u", value, alMode);
+  } else {
+    ESP_LOGW(kLogTag, "alarm_mode NOT found in form data");
   }
   // Apply changes to configSnapshot_ immediately so /api/status reflects them
   if (configChanged) {
@@ -1372,10 +1424,12 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
       activeInstance_->UpdateSensorLimits(
           fullCfg.freqMinHz, fullCfg.freqMaxHz,
           fullCfg.distanceMinMm, fullCfg.distanceMaxMm);
-      // Save geometry config separately
-      activeInstance_->adjacentMm_ = adjMm;
-      activeInstance_->offsetMm_ = offMm;
-      activeInstance_->configRepo_->SaveGeoConfig(adjMm, offMm, alMin, alMax, alMode);
+      // Save and update geo config
+      activeInstance_->UpdateGeoConfig(adjMm, offMm, alMin, alMax, alMode);
+      esp_err_t geoErr = activeInstance_->configRepo_->SaveGeoConfig(adjMm, offMm, alMin, alMax, alMode);
+      if (geoErr != ESP_OK) {
+        ESP_LOGE(kLogTag, "Falha ao salvar geo config: %s", esp_err_to_name(geoErr));
+      }
       // Persist SSID code so always-on keeps the same SSID across reboots
       if (activeInstance_->apSsidCode_ != 0) {
         fullCfg.apSsidCode = activeInstance_->apSsidCode_;
@@ -1414,16 +1468,20 @@ esp_err_t NetworkManager::FactoryResetHandler(httpd_req_t* request) {
       httpd_resp_set_status(request, "500 Internal Server Error");
       return httpd_resp_send(request, "{\"error\":\"reset_failed\"}", HTTPD_RESP_USE_STRLEN);
     }
-    // Reset in-memory limits to defaults
+    // Reset ALL in-memory state to factory defaults
     activeInstance_->UpdateSensorLimits(100, 600, 50, 5000);
+    activeInstance_->UpdateGeoConfig(2000, 0, 500, 1500, 0);
     activeInstance_->apSsidCode_ = 0;
-    // Reset geometry + alarm to defaults
-    activeInstance_->adjacentMm_ = 2000;
-    activeInstance_->offsetMm_ = 0;
-      activeInstance_->alarmMinMm_ = 500;
-      activeInstance_->alarmMaxMm_ = 1500;
-      activeInstance_->alarmActive_ = false;
-      activeInstance_->alarmMode_ = 0;
+    activeInstance_->alarmActive_ = false;
+    // Reset credentials to factory defaults
+    std::strncpy(activeInstance_->configSnapshot_.webUsername.data(), "admin", activeInstance_->configSnapshot_.webUsername.size() - 1);
+    activeInstance_->configSnapshot_.webUsername[activeInstance_->configSnapshot_.webUsername.size() - 1] = '\0';
+    std::strncpy(activeInstance_->configSnapshot_.webPassword.data(), "pulse", activeInstance_->configSnapshot_.webPassword.size() - 1);
+    activeInstance_->configSnapshot_.webPassword[activeInstance_->configSnapshot_.webPassword.size() - 1] = '\0';
+    activeInstance_->configSnapshot_.webServerAlwaysOn = 1;
+    activeInstance_->configSnapshot_.webServerTimeoutMinutes = 15;
+    activeInstance_->configSnapshot_.fixedApSsid.fill('\0');
+    activeInstance_->configSnapshot_.fixedApPassword.fill('\0');
   }
   httpd_resp_set_type(request, "application/json");
   return httpd_resp_send(request,
@@ -1476,8 +1534,65 @@ esp_err_t NetworkManager::IoMirrorDisarmHandler(httpd_req_t* request) {
 }
 
 esp_err_t NetworkManager::OtaUploadHandler(httpd_req_t* request) {
-  httpd_resp_set_status(request, "501 Not Implemented");
-  httpd_resp_send(request, nullptr, 0);
+  if (activeInstance_ == nullptr) return httpd_resp_send_500(request);
+  if (!activeInstance_->IsAuthenticated(request)) {
+    httpd_resp_set_status(request, "401 Unauthorized");
+    return httpd_resp_send(request, "{\"error\":\"auth_required\"}", HTTPD_RESP_USE_STRLEN);
+  }
+  if (request->content_len <= 0) return SendBadRequest(request);
+
+  const esp_partition_t* updatePartition = esp_ota_get_next_update_partition(nullptr);
+  if (updatePartition == nullptr) return httpd_resp_send_500(request);
+
+  if (request->content_len > static_cast<int>(updatePartition->size)) {
+    httpd_resp_set_status(request, "413 Payload Too Large");
+    return httpd_resp_send(request, "{\"error\":\"firmware_too_large\"}", HTTPD_RESP_USE_STRLEN);
+  }
+
+  constexpr size_t kChunk = 4096;
+  uint8_t* buffer = static_cast<uint8_t*>(std::malloc(kChunk));
+  if (buffer == nullptr) return httpd_resp_send_500(request);
+
+  int remaining = request->content_len;
+  bool failed = false;
+  esp_ota_handle_t otaHandle = 0;
+  esp_err_t otaErr = esp_ota_begin(updatePartition, OTA_SIZE_UNKNOWN, &otaHandle);
+  if (otaErr != ESP_OK) { std::free(buffer); return httpd_resp_send_500(request); }
+
+  while (remaining > 0) {
+    int toRead = (remaining > static_cast<int>(kChunk)) ? static_cast<int>(kChunk) : remaining;
+    int received = httpd_req_recv(request, reinterpret_cast<char*>(buffer), toRead);
+    if (received <= 0) { failed = true; break; }
+    otaErr = esp_ota_write(otaHandle, buffer, static_cast<size_t>(received));
+    if (otaErr != ESP_OK) { failed = true; break; }
+    remaining -= received;
+  }
+
+  std::free(buffer);
+
+  if (failed) {
+    esp_ota_abort(otaHandle);
+    httpd_resp_set_status(request, "500 Internal Server Error");
+    return httpd_resp_send(request, "{\"error\":\"ota_write_failed\"}", HTTPD_RESP_USE_STRLEN);
+  }
+
+  otaErr = esp_ota_end(otaHandle);
+  if (otaErr != ESP_OK) {
+    httpd_resp_set_status(request, "500 Internal Server Error");
+    return httpd_resp_send(request, "{\"error\":\"ota_end_failed\"}", HTTPD_RESP_USE_STRLEN);
+  }
+
+  otaErr = esp_ota_set_boot_partition(updatePartition);
+  if (otaErr != ESP_OK) {
+    httpd_resp_set_status(request, "500 Internal Server Error");
+    return httpd_resp_send(request, "{\"error\":\"ota_set_boot_failed\"}", HTTPD_RESP_USE_STRLEN);
+  }
+
+  ESP_LOGI(kLogTag, "OTA atualizado. Reiniciando...");
+  httpd_resp_set_type(request, "application/json");
+  httpd_resp_send(request, "{\"success\":true,\"message\":\"Firmware atualizado. Reiniciando...\"}", HTTPD_RESP_USE_STRLEN);
+  vTaskDelay(pdMS_TO_TICKS(100));
+  esp_restart();
   return ESP_OK;
 }
 
@@ -1759,7 +1874,8 @@ esp_err_t NetworkManager::StartApMode() {
   }
   BuildApSsid(reinterpret_cast<char*>(wifiConfig.ap.ssid), sizeof(wifiConfig.ap.ssid));
   wifiConfig.ap.ssid_len = static_cast<uint8_t>(std::strlen(reinterpret_cast<const char*>(wifiConfig.ap.ssid)));
-  ESP_LOGI(kLogTag, "SSID='%.*s' len=%u", wifiConfig.ap.ssid_len, wifiConfig.ap.ssid, wifiConfig.ap.ssid_len);
+  ESP_LOGI(kLogTag, "fixedSsid='%s' → AP SSID='%.*s' len=%u",
+           configSnapshot_.fixedApSsid.data(), wifiConfig.ap.ssid_len, wifiConfig.ap.ssid, wifiConfig.ap.ssid_len);
   wifiConfig.ap.channel = kApChannel;
   wifiConfig.ap.max_connection = kApMaxConnections;
   const char* effectiveApPassword =

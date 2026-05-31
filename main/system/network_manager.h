@@ -50,6 +50,14 @@ class NetworkManager {
                          uint16_t adjacentMm, int16_t offsetMm,
                          uint16_t alarmMinMm, uint16_t alarmMaxMm,
                          uint16_t alarmMode, bool alarmActive);
+  void UpdateGeoConfig(uint16_t adjacentMm, int16_t offsetMm,
+                      uint16_t alarmMinMm, uint16_t alarmMaxMm, uint16_t alarmMode);
+  void UpdateRuntimeData(float vehicleDistanceMm, float hypotenuseMm, bool alarmActive);
+  uint16_t GetAdjacentMm() const { return adjacentMm_; }
+  int16_t GetOffsetMm() const { return offsetMm_; }
+  uint16_t GetAlarmMinMm() const { return alarmMinMm_; }
+  uint16_t GetAlarmMaxMm() const { return alarmMaxMm_; }
+  uint16_t GetAlarmMode() const { return alarmMode_; }
   void SetConfigRepository(pulse::storage::ConfigRepository* repo);
   void SetApSsidCode(uint16_t code);
   uint16_t GetApSsidCode() const;
