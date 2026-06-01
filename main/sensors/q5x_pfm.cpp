@@ -91,16 +91,51 @@ void Q5X_PFM::timerCallback(void* arg) {
   float rawDist = kMinDistMm + (freqHz - kMinFreqHz) * kSlope;
 
 #if PULSE_FEATURE_SENSOR_FILTER
-  if (self->m_emaDistanceMm < 0.1f) {
-    self->m_emaDistanceMm = rawDist;
-    self->m_distanceMm = rawDist;
+  if (self->m_filterMode == 0) {
+    // Mode 0: EMA α=0.35 with clamp
+    if (self->m_emaDistanceMm < 0.1f) {
+      self->m_emaDistanceMm = rawDist;
+      self->m_distanceMm = rawDist;
+    } else {
+      self->m_emaDistanceMm = self->m_emaDistanceMm * (1.0f - kEmaAlpha) + rawDist * kEmaAlpha;
+      float deltaD = self->m_emaDistanceMm - self->m_distanceMm;
+      if (deltaD > 200.0f)      self->m_emaDistanceMm = self->m_distanceMm + 200.0f;
+      else if (deltaD < -200.0f) self->m_emaDistanceMm = self->m_distanceMm - 200.0f;
+      self->m_distanceMm = self->m_emaDistanceMm;
+    }
   } else {
-    self->m_emaDistanceMm = self->m_emaDistanceMm * (1.0f - kEmaAlpha)
-                          + rawDist * kEmaAlpha;
-    float deltaD = self->m_emaDistanceMm - self->m_distanceMm;
-    if (deltaD > 200.0f)      self->m_emaDistanceMm = self->m_distanceMm + 200.0f;
-    else if (deltaD < -200.0f) self->m_emaDistanceMm = self->m_distanceMm - 200.0f;
-    self->m_distanceMm = self->m_emaDistanceMm;
+    // Mode 1: Buffer + Median + EMA α=0.20
+    self->m_distBuf[self->m_distBufIdx] = rawDist;
+    self->m_distBufIdx = (self->m_distBufIdx + 1) % kBufSize;
+    if (self->m_distBufCount < kBufSize) self->m_distBufCount++;
+
+    if (self->m_distBufCount >= 4) {
+      float sorted[kBufSize];
+      uint8_t n = self->m_distBufCount;
+      for (uint8_t i = 0; i < n; i++) sorted[i] = self->m_distBuf[i];
+      // insertion sort for small array
+      for (uint8_t i = 1; i < n; i++) {
+        float key = sorted[i];
+        int8_t j = i - 1;
+        while (j >= 0 && sorted[j] > key) { sorted[j + 1] = sorted[j]; j--; }
+        sorted[j + 1] = key;
+      }
+      // discard top & bottom 25% (2 each for 8)
+      uint8_t trim = n / 4;
+      uint8_t start = trim;
+      uint8_t end = n - trim;
+      // median of trimmed range
+      uint8_t medIdx = start + (end - start) / 2;
+      float med = sorted[medIdx];
+
+      if (self->m_emaDistanceMm < 0.1f) {
+        self->m_emaDistanceMm = med;
+        self->m_distanceMm = med;
+      } else {
+        self->m_emaDistanceMm = self->m_emaDistanceMm * (1.0f - kEmaAlphaBuf) + med * kEmaAlphaBuf;
+        self->m_distanceMm = self->m_emaDistanceMm;
+      }
+    }
   }
 #else
   self->m_distanceMm = rawDist;
@@ -109,6 +144,13 @@ void Q5X_PFM::timerCallback(void* arg) {
   if (self->m_distanceMm < kMinDistMm) self->m_distanceMm = kMinDistMm;
   if (self->m_distanceMm > kMaxDistMm) self->m_distanceMm = kMaxDistMm;
   self->m_status = kOk;
+}
+
+void Q5X_PFM::setFilterMode(uint16_t mode) {
+  m_filterMode = (mode > 0) ? 1 : 0;
+  m_emaDistanceMm = 0;  // reset EMA to force re-acquisition
+  m_distBufIdx = 0;
+  m_distBufCount = 0;
 }
 
 void Q5X_PFM::update() {

@@ -70,6 +70,12 @@ void setup() {
   g_configRepo.LoadGeoConfig(&adj, &off, &alMin, &alMax, &alMode);
   g_networkManager.UpdateGeometryData(0, 0, adj, off, alMin, alMax, alMode, false);
 
+  // ── Load sensor filter mode ─────────────────────────────
+  uint16_t filterMode = 1;
+  g_configRepo.LoadSensorMode(&filterMode);
+  g_networkManager.SetSensorFilterMode(filterMode);
+  g_sensor.setFilterMode(filterMode);
+
   gpio_config_t alarmCfg = {};
   alarmCfg.pin_bit_mask = 1ULL << config.alarmGpio;
   alarmCfg.mode = GPIO_MODE_OUTPUT;
@@ -145,6 +151,14 @@ void loop() {
   }
 
   g_sensor.update();
+
+  // Sync sensor filter mode from web config
+  static uint16_t lastSensorMode = 1;
+  uint16_t currentMode = g_networkManager.GetSensorFilterMode();
+  if (currentMode != lastSensorMode) {
+    g_sensor.setFilterMode(currentMode);
+    lastSensorMode = currentMode;
+  }
 
   // ── Pythagoras: vehicle distance + alarm GPIO ────────────
   float rawDist = g_sensor.getDistanceMm();

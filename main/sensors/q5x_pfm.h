@@ -16,6 +16,7 @@ public:
 
   void init(int gpio = 38);
   void update();
+  void setFilterMode(uint16_t mode);
   float getFrequencyHz() const;
   float getDistanceMm() const;
   uint32_t getPeriodUs() const;
@@ -31,6 +32,8 @@ private:
   static constexpr uint32_t kNoSignalGapUs = 300000;
   static constexpr uint32_t kSampleIntervalMs = 80;
   static constexpr float kEmaAlpha = 0.35f;
+  static constexpr float kEmaAlphaBuf = 0.20f;
+  static constexpr uint8_t kBufSize = 8;
 
   static void timerCallback(void* arg);
 
@@ -47,6 +50,10 @@ private:
   int m_lastCount = 0;
   uint32_t m_readPeriodUs = 0;
   uint32_t m_isrRejected = 0;
+  uint16_t m_filterMode = 1;
+  float m_distBuf[8] = {0};
+  uint8_t m_distBufIdx = 0;
+  uint8_t m_distBufCount = 0;  // 0=EMA dir, 1=Buffer+Med+EMA
 };
 
 #endif

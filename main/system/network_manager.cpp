@@ -13,6 +13,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_ota_ops.h"
+#include "shared/build_features.h"
 #include "esp_partition.h"
 #include "esp_random.h"
 #include "esp_system.h"
@@ -176,6 +177,7 @@ NetworkManager::NetworkManager()
       alarmMinMm_(500),
       alarmMaxMm_(1500),
       alarmMode_(0),
+      sensorFilterMode_(1),
       alarmActive_(false),
       configRepo_(nullptr) {
   activeInstance_ = this;
@@ -723,12 +725,16 @@ R"html(
       <details class='section'>
         <summary class='section-toggle'>
           <div class='section-heading'>
-            <h2>Limites do Sensor</h2>
-            <p>Defina os limites de operação do sensor de distância e frequência.</p>
+            <h2>Sensor</h2>
+            <p>Parâmetros de leitura e filtragem do sensor laser.</p>
           </div>
         </summary>
         <div class='section-body'>
           <div class='grid'>
+            <label><span>Algoritmo de filtro</span><select id='sensorFilterMode' onchange='triggerAutoSave()'>
+              <option value='0'>EMA direto (rápido)</option>
+              <option value='1'>Buffer + Mediana + EMA (suave)</option>
+            </select></label>
             <label><span>Frequência mínima Hz</span><input id='freqMinHz' type='number' min='1' max='10000' value='100' onchange='triggerAutoSave()'></label>
             <label><span>Frequência máxima Hz</span><input id='freqMaxHz' type='number' min='1' max='10000' value='600' onchange='triggerAutoSave()'></label>
             <label><span>Distância mínima mm</span><input id='distanceMinMm' type='number' min='1' max='10000' value='50' onchange='triggerAutoSave()'></label>
@@ -896,7 +902,7 @@ R"html(
     }
     async function autoSave(){
       autoSaveTimer=null
-      const payload={freq_min_hz:v('freqMinHz'),freq_max_hz:v('freqMaxHz'),distance_min_mm:v('distanceMinMm'),distance_max_mm:v('distanceMaxMm'),adjacent_mm:v('adjacentMm'),offset_mm:v('offsetMm'),alarm_min_mm:v('alarmMinMm'),alarm_max_mm:v('alarmMaxMm'),alarm_mode:v('alarmMode'),web_always_on:v('webAlwaysOn'),web_timeout_minutes:v('webTimeoutMinutes'),fixed_ssid:v('fixedApSsid'),fixed_ip:v('fixedApIp'),alias:String(latestData?latestData.alias:1)}
+      const payload={sensor_filter_mode:v('sensorFilterMode'),freq_min_hz:v('freqMinHz'),freq_max_hz:v('freqMaxHz'),distance_min_mm:v('distanceMinMm'),distance_max_mm:v('distanceMaxMm'),adjacent_mm:v('adjacentMm'),offset_mm:v('offsetMm'),alarm_min_mm:v('alarmMinMm'),alarm_max_mm:v('alarmMaxMm'),alarm_mode:v('alarmMode'),web_always_on:v('webAlwaysOn'),web_timeout_minutes:v('webTimeoutMinutes'),fixed_ssid:v('fixedApSsid'),fixed_ip:v('fixedApIp'),alias:String(latestData?latestData.alias:1)}
       const webUser=v('webUsername')
       const webPass=v('webPassword')
       if(webUser){payload.web_user=webUser}
@@ -927,10 +933,8 @@ R"html(
       if(!fileInput.files||fileInput.files.length===0){window.alert('Selecione um arquivo .bin primeiro.');return}
       const file=fileInput.files[0]
       if(!window.confirm('Confirma enviar o firmware OTA? O gateway sera reiniciado ao final.'))return
-      const formData=new FormData()
-      formData.append('firmware',file)
       try{
-        const response=await fetch('/api/device/ota',{method:'POST',body:formData})
+        const response=await fetch('/api/device/ota',{method:'POST',body:file,headers:{'Content-Type':'application/octet-stream'}})
         if(response.ok){
           const result=await response.json()
           window.alert(result.message||'Firmware enviado. Reiniciando...')
@@ -959,6 +963,7 @@ R"html(
         document.getElementById('wifiSsidSummary').textContent=latestData.configured_ssid||'--'
         document.getElementById('wifiIpSummary').textContent=latestData.configured_ap_ip||'--'
         document.getElementById('freqMinHz').value=String(latestData.freq_min_hz||100)
+        document.getElementById('sensorFilterMode').value=String(latestData.sensor_filter_mode!==undefined?latestData.sensor_filter_mode:1)
         document.getElementById('freqMaxHz').value=String(latestData.freq_max_hz||600)
         document.getElementById('distanceMinMm').value=String(latestData.distance_min_mm||50)
         document.getElementById('distanceMaxMm').value=String(latestData.distance_max_mm||5000)
@@ -1048,6 +1053,7 @@ esp_err_t NetworkManager::StatusHandler(httpd_req_t* request) {
       "\"alarm_min_mm\":%u,"
       "\"alarm_max_mm\":%u,"
       "\"alarm_mode\":%u,"
+      "\"sensor_filter_mode\":%u,"
       "\"freq_min_hz\":%u,"
       "\"freq_max_hz\":%u,"
       "\"distance_min_mm\":%u,"
@@ -1085,7 +1091,7 @@ esp_err_t NetworkManager::StatusHandler(httpd_req_t* request) {
       activeInstance_->configSnapshot_.deviceUidFullWords[2],
       activeInstance_->configSnapshot_.deviceUidFullWords[3],
       static_cast<unsigned>(activeInstance_->configSnapshot_.deviceVariant),
-      "1.0.0",
+      pulse::shared::kFirmwareVersionValue,
       static_cast<unsigned>(activeInstance_->systemState_),
       activeInstance_->apModeActive_ ? "true" : "false",
       activeInstance_->connectedStations_,
@@ -1107,6 +1113,7 @@ esp_err_t NetworkManager::StatusHandler(httpd_req_t* request) {
         activeInstance_->alarmMinMm_,
         activeInstance_->alarmMaxMm_,
         activeInstance_->alarmMode_,
+        activeInstance_->sensorFilterMode_,
        activeInstance_->sensorFreqMinHz_,
        activeInstance_->sensorFreqMaxHz_,
        activeInstance_->sensorDistanceMinMm_,
@@ -1329,6 +1336,11 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
   sensorCfg.freqMaxHz = 600;
   sensorCfg.distanceMinMm = 50;
   sensorCfg.distanceMaxMm = 5000;
+  uint16_t filterMode = activeInstance_->sensorFilterMode_;
+  if (activeInstance_->ExtractFormValue(formData, "sensor_filter_mode", &value)) {
+    filterMode = (value > 0) ? 1 : 0;
+    configChanged = true;
+  }
   if (activeInstance_->ExtractFormValue(formData, "freq_min_hz", &value)) {
     sensorCfg.freqMinHz = ClampU16(value, 50, 700);
     configChanged = true;
@@ -1430,6 +1442,9 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
       if (geoErr != ESP_OK) {
         ESP_LOGE(kLogTag, "Falha ao salvar geo config: %s", esp_err_to_name(geoErr));
       }
+      // Persist sensor filter mode
+      activeInstance_->sensorFilterMode_ = filterMode;
+      activeInstance_->configRepo_->SaveSensorMode(filterMode);
       // Persist SSID code so always-on keeps the same SSID across reboots
       if (activeInstance_->apSsidCode_ != 0) {
         fullCfg.apSsidCode = activeInstance_->apSsidCode_;
@@ -1473,6 +1488,7 @@ esp_err_t NetworkManager::FactoryResetHandler(httpd_req_t* request) {
     activeInstance_->UpdateGeoConfig(2000, 0, 500, 1500, 0);
     activeInstance_->apSsidCode_ = 0;
     activeInstance_->alarmActive_ = false;
+    activeInstance_->sensorFilterMode_ = 1;
     // Reset credentials to factory defaults
     std::strncpy(activeInstance_->configSnapshot_.webUsername.data(), "admin", activeInstance_->configSnapshot_.webUsername.size() - 1);
     activeInstance_->configSnapshot_.webUsername[activeInstance_->configSnapshot_.webUsername.size() - 1] = '\0';
@@ -1562,9 +1578,16 @@ esp_err_t NetworkManager::OtaUploadHandler(httpd_req_t* request) {
   while (remaining > 0) {
     int toRead = (remaining > static_cast<int>(kChunk)) ? static_cast<int>(kChunk) : remaining;
     int received = httpd_req_recv(request, reinterpret_cast<char*>(buffer), toRead);
-    if (received <= 0) { failed = true; break; }
+    if (received <= 0) {
+      ESP_LOGE(kLogTag, "OTA: httpd_req_recv falhou, received=%d, remaining=%d", received, remaining);
+      failed = true; break;
+    }
     otaErr = esp_ota_write(otaHandle, buffer, static_cast<size_t>(received));
-    if (otaErr != ESP_OK) { failed = true; break; }
+    if (otaErr != ESP_OK) {
+      ESP_LOGE(kLogTag, "OTA: esp_ota_write falhou: %s (written=%d, remaining=%d)",
+               esp_err_to_name(otaErr), static_cast<int>(received), remaining);
+      failed = true; break;
+    }
     remaining -= received;
   }
 

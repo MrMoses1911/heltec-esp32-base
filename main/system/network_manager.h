@@ -58,6 +58,8 @@ class NetworkManager {
   uint16_t GetAlarmMinMm() const { return alarmMinMm_; }
   uint16_t GetAlarmMaxMm() const { return alarmMaxMm_; }
   uint16_t GetAlarmMode() const { return alarmMode_; }
+  uint16_t GetSensorFilterMode() const { return sensorFilterMode_; }
+  void SetSensorFilterMode(uint16_t mode) { sensorFilterMode_ = mode; }
   void SetConfigRepository(pulse::storage::ConfigRepository* repo);
   void SetApSsidCode(uint16_t code);
   uint16_t GetApSsidCode() const;
@@ -155,6 +157,7 @@ class NetworkManager {
   uint16_t alarmMinMm_;
   uint16_t alarmMaxMm_;
   uint16_t alarmMode_;
+  uint16_t sensorFilterMode_;
   bool alarmActive_;
   pulse::storage::ConfigRepository* configRepo_;
 

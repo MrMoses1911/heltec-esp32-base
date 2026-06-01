@@ -23,6 +23,7 @@ struct SafeDockConfig {
   uint16_t alarmMaxMm = 1500;        // zona de alarme max (mm)
   uint16_t alarmGpio = 34;           // GPIO do alarme
   uint16_t alarmMode = 0;            // 0=zona (min≤X≤max), 1=limite (X<min ∨ X>max)
+  uint16_t sensorFilterMode = 1;     // 0=EMA direto, 1=Buffer+Mediana+EMA
   char webUsername[16] = {'a', 'd', 'm', 'i', 'n', '\0'};
   char webPassword[16] = {'p', 'u', 'l', 's', 'e', '\0'};
   char apSsid[33] = {};
@@ -43,6 +44,8 @@ class ConfigRepository {
                           uint16_t alarmMinMm, uint16_t alarmMaxMm, uint16_t alarmMode);
   esp_err_t LoadGeoConfig(uint16_t* adjacentMm, int16_t* offsetMm,
                           uint16_t* alarmMinMm, uint16_t* alarmMaxMm, uint16_t* alarmMode);
+  esp_err_t SaveSensorMode(uint16_t mode);
+  esp_err_t LoadSensorMode(uint16_t* mode);
   esp_err_t FactoryReset();
 
  private:

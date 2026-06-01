@@ -126,5 +126,17 @@ esp_err_t ConfigRepository::LoadGeoConfig(uint16_t* adjacentMm,
   return ESP_OK;
 }
 
+esp_err_t ConfigRepository::SaveSensorMode(uint16_t mode) {
+  if (store_ == nullptr) return ESP_ERR_INVALID_STATE;
+  return store_->WriteU16(kNamespace, "sens_mode", mode);
+}
+
+esp_err_t ConfigRepository::LoadSensorMode(uint16_t* mode) {
+  if (store_ == nullptr || mode == nullptr) return ESP_ERR_INVALID_ARG;
+  auto def = [](esp_err_t e, uint16_t* v, uint16_t d) { *v = (e == ESP_OK) ? *v : d; };
+  def(store_->ReadU16(kNamespace, "sens_mode", mode), mode, 1);
+  return ESP_OK;
+}
+
 }  // namespace storage
 }  // namespace pulse

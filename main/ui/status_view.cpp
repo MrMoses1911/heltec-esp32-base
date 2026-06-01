@@ -1,6 +1,7 @@
 #include "ui/status_view.h"
 #include "ui/boot_logo.h"
 #include "platform/platform_bootstrap.h"
+#include "shared/build_features.h"
 
 #include <cstdio>
 #include <cstring>
@@ -157,6 +158,9 @@ void RenderWebRuntime(const MenuManager::RuntimeData& data) {
 
   snprintf(buf, sizeof(buf), "RX: %u  TX: %u", data.rxPackets, data.txPackets);
   DisplayDrawText(0, y, buf); y += kLineH;
+
+  DisplayDrawText(0, y, pulse::shared::kFirmwareVersionLabel);
+  y += kLineH;
 
   DisplayDrawText(0, 54, "Segure 2s para voltar");
   DisplayPresent();
