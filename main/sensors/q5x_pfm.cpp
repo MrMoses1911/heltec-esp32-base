@@ -103,8 +103,8 @@ void Q5X_PFM::timerCallback(void* arg) {
       else if (deltaD < -200.0f) self->m_emaDistanceMm = self->m_distanceMm - 200.0f;
       self->m_distanceMm = self->m_emaDistanceMm;
     }
-  } else {
-    // Mode 1: Buffer + Median + EMA α=0.20
+  } else if (self->m_filterMode == 1) {
+    // Mode 1: Buffer 8 + trim 2 + EMA α=0.20
     self->m_distBuf[self->m_distBufIdx] = rawDist;
     self->m_distBufIdx = (self->m_distBufIdx + 1) % kBufSize;
     if (self->m_distBufCount < kBufSize) self->m_distBufCount++;
@@ -113,26 +113,50 @@ void Q5X_PFM::timerCallback(void* arg) {
       float sorted[kBufSize];
       uint8_t n = self->m_distBufCount;
       for (uint8_t i = 0; i < n; i++) sorted[i] = self->m_distBuf[i];
-      // insertion sort for small array
       for (uint8_t i = 1; i < n; i++) {
-        float key = sorted[i];
-        int8_t j = i - 1;
+        float key = sorted[i]; int8_t j = i - 1;
         while (j >= 0 && sorted[j] > key) { sorted[j + 1] = sorted[j]; j--; }
         sorted[j + 1] = key;
       }
-      // discard top & bottom 25% (2 each for 8)
-      uint8_t trim = n / 4;
-      uint8_t start = trim;
-      uint8_t end = n - trim;
-      // median of trimmed range
-      uint8_t medIdx = start + (end - start) / 2;
-      float med = sorted[medIdx];
-
+      uint8_t trim = n / 4, start = trim, end = n - trim;
+      float med = sorted[start + (end - start) / 2];
       if (self->m_emaDistanceMm < 0.1f) {
-        self->m_emaDistanceMm = med;
-        self->m_distanceMm = med;
+        self->m_emaDistanceMm = med; self->m_distanceMm = med;
       } else {
         self->m_emaDistanceMm = self->m_emaDistanceMm * (1.0f - kEmaAlphaBuf) + med * kEmaAlphaBuf;
+        self->m_distanceMm = self->m_emaDistanceMm;
+      }
+    }
+  } else if (self->m_filterMode == 2) {
+    // Mode 2: Buffer 6 + trim 1 + EMA α=0.35 + Jump Detect
+    float lastVal = self->m_distanceMm > 0.1f ? self->m_distanceMm : rawDist;
+    float jump = (rawDist > lastVal) ? (rawDist - lastVal) : (lastVal - rawDist);
+    if (jump > kJumpThreshold) {
+      self->m_distBufIdx = 0;
+      self->m_distBufCount = 0;
+      self->m_emaDistanceMm = rawDist;
+      self->m_distanceMm = rawDist;
+    }
+    self->m_distBuf[self->m_distBufIdx] = rawDist;
+    self->m_distBufIdx = (self->m_distBufIdx + 1) % kBufSizeFast;
+    if (self->m_distBufCount < kBufSizeFast) self->m_distBufCount++;
+
+    if (self->m_distBufCount >= 3) {
+      float sorted[kBufSizeFast];
+      uint8_t n = self->m_distBufCount;
+      for (uint8_t i = 0; i < n; i++) sorted[i] = self->m_distBuf[i];
+      for (uint8_t i = 1; i < n; i++) {
+        float key = sorted[i]; int8_t j = i - 1;
+        while (j >= 0 && sorted[j] > key) { sorted[j + 1] = sorted[j]; j--; }
+        sorted[j + 1] = key;
+      }
+      uint8_t start = (n >= 5) ? 1 : 0;
+      uint8_t end   = (n >= 5) ? (n - 1) : n;
+      float med = sorted[start + (end - start) / 2];
+      if (self->m_emaDistanceMm < 0.1f) {
+        self->m_emaDistanceMm = med; self->m_distanceMm = med;
+      } else {
+        self->m_emaDistanceMm = self->m_emaDistanceMm * (1.0f - kEmaAlphaJump) + med * kEmaAlphaJump;
         self->m_distanceMm = self->m_emaDistanceMm;
       }
     }
@@ -147,8 +171,8 @@ void Q5X_PFM::timerCallback(void* arg) {
 }
 
 void Q5X_PFM::setFilterMode(uint16_t mode) {
-  m_filterMode = (mode > 0) ? 1 : 0;
-  m_emaDistanceMm = 0;  // reset EMA to force re-acquisition
+  m_filterMode = mode;
+  m_emaDistanceMm = 0;
   m_distBufIdx = 0;
   m_distBufCount = 0;
 }

@@ -26,7 +26,7 @@
 #endif
 
 #ifndef PULSE_FW_VERSION_PATCH
-#define PULSE_FW_VERSION_PATCH 1
+#define PULSE_FW_VERSION_PATCH 5
 #endif
 
 #define PULSE_STRINGIZE_IMPL(x) #x

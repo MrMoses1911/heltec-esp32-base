@@ -33,7 +33,10 @@ private:
   static constexpr uint32_t kSampleIntervalMs = 80;
   static constexpr float kEmaAlpha = 0.35f;
   static constexpr float kEmaAlphaBuf = 0.20f;
+  static constexpr float kEmaAlphaJump = 0.35f;
   static constexpr uint8_t kBufSize = 8;
+  static constexpr uint8_t kBufSizeFast = 6;
+  static constexpr float kJumpThreshold = 300.0f;
 
   static void timerCallback(void* arg);
 

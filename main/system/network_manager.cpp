@@ -510,6 +510,7 @@ R"html(
             <span>Frequência</span>
             <strong><span class='sensor-value' id='sensorFrequency'>--</span> <span class='sensor-unit'>Hz</span></strong>
             <small>Limites <span id='sensorLimits'>--</span></small>
+            <small style='display:block;margin-top:4px;'>Filtro: <span id='sensorFilterLabel' style='color:#fff;'>--</span></small>
           </div>
         </div>
       </section>
@@ -611,6 +612,8 @@ R"html(
       const validEl=document.getElementById('sensorValid')
       validEl.textContent=sensorValid?'OK':'INVALIDO'
       validEl.className='status-chip '+(sensorValid?'ok':'alarm')
+      const filterLabels={0:'EMA',1:'Buffer+Med',2:'JumpDetect'}
+      document.getElementById('sensorFilterLabel').textContent=filterLabels[data.sensor_filter_mode]||'?'
       document.getElementById('sensorLimits').textContent=String(data.freq_min_hz||'--')+' / '+String(data.freq_max_hz||'--')+' Hz  |  '+String(data.distance_min_mm||'--')+' / '+String(data.distance_max_mm||'--')+' mm'
 
       document.getElementById('vehicleDistance').textContent=String(data.vehicle_distance_mm||'--')
@@ -734,6 +737,7 @@ R"html(
             <label><span>Algoritmo de filtro</span><select id='sensorFilterMode' onchange='triggerAutoSave()'>
               <option value='0'>EMA direto (rápido)</option>
               <option value='1'>Buffer + Mediana + EMA (suave)</option>
+              <option value='2'>Jump Detect + Mediana (rápido e suave)</option>
             </select></label>
             <label><span>Frequência mínima Hz</span><input id='freqMinHz' type='number' min='1' max='10000' value='100' onchange='triggerAutoSave()'></label>
             <label><span>Frequência máxima Hz</span><input id='freqMaxHz' type='number' min='1' max='10000' value='600' onchange='triggerAutoSave()'></label>
@@ -1338,7 +1342,7 @@ esp_err_t NetworkManager::DeviceConfigHandler(httpd_req_t* request) {
   sensorCfg.distanceMaxMm = 5000;
   uint16_t filterMode = activeInstance_->sensorFilterMode_;
   if (activeInstance_->ExtractFormValue(formData, "sensor_filter_mode", &value)) {
-    filterMode = (value > 0) ? 1 : 0;
+    filterMode = value;
     configChanged = true;
   }
   if (activeInstance_->ExtractFormValue(formData, "freq_min_hz", &value)) {
