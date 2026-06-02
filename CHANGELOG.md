@@ -15,8 +15,12 @@
 - Timer TASK de 80ms para amostragem (sem ISR, sem crash com Wi-Fi)
 - Filtro de glitch por hardware (PCNT, 1µs)
 - Flag `PULSE_FEATURE_SENSOR_FILTER` para alternar entre leitura crua e filtrada
-- Modo filtrado: mediana + MAD + EMA (α=0.35, clamp 200mm)
-- Modo cru: último período → Hz → mm, sem filtro
+- 3 algoritmos de filtro selecionáveis via web:
+  - **Modo 0 (EMA direto)**: EMA α=0.35 + clamp 200mm
+  - **Modo 1 (Suave)**: Buffer 8 + mediana aparada (trima 25%) + EMA α=0.20
+  - **Modo 2 (Jump Detect)**: Buffer 6 + trim 1 + EMA α=0.35 + Jump Detect 300mm (recomendado)
+- Indicador do filtro ativo na página Monitor
+- Persistido em NVS (`sens_mode`)
 
 ### Geometria — Distância do Veículo
 - Cálculo: `distVeículo = sqrt(max(laser² - adjacente², 0)) + offset`
