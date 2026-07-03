@@ -62,16 +62,16 @@ bool IsButtonPressed() {
   return first && second;
 }
 
-void DisplayClear() {
-  display.clear();
-}
-
 void DisplaySetFontNormal() {
   display.setFont(ArialMT_Plain_10);
 }
 
 void DisplaySetFontLarge() {
   display.setFont(ArialMT_Plain_16);
+}
+
+void DisplayClear() {
+  display.clear();
 }
 
 void DisplayDrawText(int16_t x, int16_t y, const char* text) {

@@ -1,73 +1,249 @@
-# heltec-esp32-base — Clean template for Heltec WiFi LoRa V3
+# AGENTS.md
 
-ESP-IDF 5.5.3 firmware template targeting **ESP32-S3** / **Heltec WiFi LoRa V3** (SX1262). Based on the architecture of **Pulse IoT Gateway** but stripped of application-specific logic — reusable skeleton for new LoRa + OLED + Arduino projects.
+This file provides guidance to AI coding agents (Claude Code, Cursor, Copilot, Antigravity, etc.) when working with code in this repository.
 
-> This repo runs in WSL but **all ESP-IDF commands must execute on the Windows host** (the toolchain lives under `C:\Espressif\tools\`, Python venv under `C:\esp\v5.5.3\esp-idf`).
+## Repository Overview
 
-## Quick start (Windows)
+A collection of skills for Claude.ai and Claude Code for senior software engineers. Skills are packaged instructions and scripts that extend Claude and your coding agents capabilities.
+
+## OpenCode Integration
+
+OpenCode uses a **skill-driven execution model** powered by the `skill` tool and this repository's `/skills` directory.
+
+### Core Rules
+
+- If a task matches a skill, you MUST invoke it
+- Skills are located in `skills/<skill-name>/SKILL.md`
+- Never implement directly if a skill applies
+- Always follow the skill instructions exactly (do not partially apply them)
+
+### Intent → Skill Mapping
+
+The agent should automatically map user intent to skills:
+
+- Feature / new functionality → `spec-driven-development`, then `incremental-implementation`, `test-driven-development`
+- Planning / breakdown → `planning-and-task-breakdown`
+- Bug / failure / unexpected behavior → `debugging-and-error-recovery`
+- Code review → `code-review-and-quality`
+- Refactoring / simplification → `code-simplification`
+- API or interface design → `api-and-interface-design`
+- UI work → `frontend-ui-engineering`
+
+### Lifecycle Mapping (Implicit Commands)
+
+OpenCode does not support slash commands like `/spec` or `/plan`.
+
+Instead, the agent must internally follow this lifecycle:
+
+- DEFINE → `spec-driven-development`
+- PLAN → `planning-and-task-breakdown`
+- BUILD → `incremental-implementation` + `test-driven-development`
+- VERIFY → `debugging-and-error-recovery`
+- REVIEW → `code-review-and-quality`
+- SHIP → `shipping-and-launch`
+
+### Execution Model
+
+For every request:
+
+1. Determine if any skill applies (even 1% chance)
+2. Invoke the appropriate skill using the `skill` tool
+3. Follow the skill workflow strictly
+4. Only proceed to implementation after required steps (spec, plan, etc.) are complete
+
+### Anti-Rationalization
+
+The following thoughts are incorrect and must be ignored:
+
+- "This is too small for a skill"
+- "I can just quickly implement this"
+- "I’ll gather context first"
+
+Correct behavior:
+
+- Always check for and use skills first
+
+This ensures OpenCode behaves similarly to Claude Code with full workflow enforcement.
+
+## Orchestration: Personas, Skills, and Commands
+
+This repo has three composable layers. They have different jobs and should not be confused:
+
+- **Skills** (`skills/<name>/SKILL.md`) — workflows with steps and exit criteria. The *how*. Mandatory hops when an intent matches.
+- **Personas** (`agents/<role>.md`) — roles with a perspective and an output format. The *who*.
+- **Slash commands** (`.claude/commands/*.md`) — user-facing entry points. The *when*. The orchestration layer.
+
+Composition rule: **the user (or a slash command) is the orchestrator. Personas do not invoke other personas.** A persona may invoke skills.
+
+The only multi-persona orchestration pattern this repo endorses is **parallel fan-out with a merge step** — used by `/ship` to run `code-reviewer`, `security-auditor`, and `test-engineer` concurrently and synthesize their reports. Do not build a "router" persona that decides which other persona to call; that's the job of slash commands and intent mapping.
+
+See [agents/README.md](agents/README.md) for the decision matrix and [references/orchestration-patterns.md](references/orchestration-patterns.md) for the full pattern catalog.
+
+**Claude Code interop:** the personas in `agents/` work as Claude Code subagents (auto-discovered from this plugin's `agents/` directory) and as Agent Teams teammates (referenced by name when spawning). Two platform constraints align with our rules: subagents cannot spawn other subagents, and teams cannot nest. Plugin agents silently ignore the `hooks`, `mcpServers`, and `permissionMode` frontmatter fields.
+
+## Creating a New Skill
+
+### Directory Structure
+
+```
+skills/
+  {skill-name}/           # kebab-case directory name
+    SKILL.md              # Required: skill definition
+    scripts/              # Required: executable scripts
+      {script-name}.sh    # Bash scripts (preferred)
+  {skill-name}.zip        # Required: packaged for distribution
+```
+
+### Naming Conventions
+
+- **Skill directory**: `kebab-case` (e.g. `web-quality`)
+- **SKILL.md**: Always uppercase, always this exact filename
+- **Scripts**: `kebab-case.sh` (e.g., `deploy.sh`, `fetch-logs.sh`)
+- **Zip file**: Must match directory name exactly: `{skill-name}.zip`
+
+### SKILL.md Format
+
+```markdown
+---
+name: {skill-name}
+description: {One sentence describing what the skill does, followed by one or more "Use when" trigger conditions. Include trigger phrases like "Deploy my app" or "Check logs" when helpful.}
+---
+
+# {Skill Title}
+
+{Brief overview of what the skill does and why it matters.}
+
+## How It Works
+
+{Numbered list explaining the skill's workflow}
+
+Equivalent headings like `Workflow`, `Core Process`, or `When to Use` are fine when they communicate the same structure clearly.
+
+## Usage (Optional)
+
+Include this section only if the skill ships runnable helpers under `scripts/`. Markdown-only skills can omit both the section and the directory entirely.
+
+```bash
+bash /mnt/skills/user/{skill-name}/scripts/{script}.sh [args]
+```
+
+**Arguments:**
+- `arg1` - Description (defaults to X)
+
+**Examples:**
+{Show 2-3 common usage patterns}
+
+## Output
+
+{Show example output users will see}
+
+## Present Results to User
+
+{Template for how Claude should format results when presenting to users}
+
+## Troubleshooting
+
+{Common issues and solutions, especially network/permissions errors}
+```
+
+### Best Practices for Context Efficiency
+
+Skills are loaded on-demand — only the skill name and description are loaded at startup. The full `SKILL.md` loads into context only when the agent decides the skill is relevant. To minimize context usage:
+
+- **Keep SKILL.md under 500 lines** — put detailed reference material in separate files
+- **Write specific descriptions** — helps the agent know exactly when to activate the skill
+- **Use progressive disclosure** — reference supporting files that get read only when needed
+- **Prefer scripts over inline code** — script execution doesn't consume context (only output does)
+- **File references work one level deep** — link directly from SKILL.md to supporting files
+
+### Script Requirements
+
+- Use `#!/bin/bash` shebang
+- Use `set -e` for fail-fast behavior
+- Write status messages to stderr: `echo "Message" >&2`
+- Write machine-readable output (JSON) to stdout
+- Include a cleanup trap for temp files
+- Reference the script path as `/mnt/skills/user/{skill-name}/scripts/{script}.sh`
+
+### Creating the Zip Package
+
+After creating or updating a skill:
+
+```bash
+cd skills
+zip -r {skill-name}.zip {skill-name}/
+```
+
+### End-User Installation
+
+Document these two installation methods for users:
+
+**Claude Code:**
+```bash
+cp -r skills/{skill-name} ~/.claude/skills/
+```
+
+**claude.ai:**
+Add the skill to project knowledge or paste SKILL.md contents into the conversation.
+
+If the skill requires network access, instruct users to add required domains at `claude.ai/settings/capabilities`.
+
+# Quick start (Windows)
 
 ```batch
-:: 1. Source the ESP-IDF environment (cmd.exe)
+:: cmd.exe
 C:\esp\v5.5.3\esp-idf\export.bat
-
-:: 2. Configure (first time or after adding components)
 idf.py set-target esp32s3
-idf.py reconfigure
-
-:: 3. Build
 idf.py build
-
-:: 4. Flash + monitor
 idf.py -p COM8 flash monitor
 ```
 
-Port is typically `COM3`–`COM8` on Windows, `/dev/ttyACM0` or `/dev/ttyUSB0` on Linux.
-
 ## Commands from WSL
 
-The first build (or any build after changing source files in `main/CMakeLists.txt`) must run from Windows to regenerate `build/build.ninja`:
-
-```batch
-C:\esp\v5.5.3\esp-idf\export.bat
-idf.py build
-```
-
-After that, subsequent builds can run from WSL via Ninja directly:
+First build always from Windows. Subsequent builds can run via Ninja:
 
 ```bash
 /mnt/c/Espressif/tools/ninja/1.12.1/ninja.EXE -C build
 ```
 
-To reconfigure (`idf.py reconfigure`) or flash (`idf.py -p COM8 flash`), always switch to Windows cmd/PowerShell — do NOT source `export.sh` inside WSL (paths are Windows-native).
+To reconfigure after CMakeLists.txt changes (must set toolchain manually):
 
-## Template structure
+```bash
+cmd.exe /c "set PATH=C:\Espressif\tools\xtensa-esp-elf\esp-14.2.0_20251107\xtensa-esp-elf\bin;%PATH% && set IDF_PATH=C:\esp\v5.5.3\esp-idf && set PYTHON=C:\Espressif\tools\python\v5.5.3\venv\Scripts\python.exe && C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe -S C:\esp\Projetos\Pulse_SafeDock -B C:\esp\Projetos\Pulse_SafeDock\build -DCMAKE_TOOLCHAIN_FILE=C:\esp\v5.5.3\esp-idf\tools\cmake\toolchain-esp32s3.cmake -G Ninja"
+```
+
+## Project structure
 
 ```
-CMakeLists.txt               # Top-level project
-sdkconfig.defaults            # Tracked defaults (8MB flash, Arduino framework, OEM partition)
-partition_tables/
-  partitions_8mb_factory_ota_balanced.csv  # factory + ota_0 + ota_1
-components/
-  heltec_esp32_lora_v3/       # Board abstraction (OLED, button, LED, SX1262)
-  arduino/                    # ESP32 Arduino core
-  RadioLib/                   # SX126x driver
-  esp8266-oled-ssd1306/       # OLED display (SSD1306/SH1106)
-  HotButton/                  # Button handling
 main/
-  main.cpp                    # Entry: Arduino setup() + loop()
-  CMakeLists.txt              # Registers source files + REQUIRES components
-  platform/
-    platform_bootstrap.h      # Board abstraction header
-    platform_bootstrap.cpp    # Heltec init, OLED, button, radio wrappers
+  CMakeLists.txt             10 source files, REQUIRES nvs_flash
+  main.cpp                   setup() + loop() with menu system
+  shared/                    Types (app_types, app_commands, app_events, build_features, io_snapshot)
+  platform/                  Board abstraction (OLED, button, radio)
+  sensors/                   Q5X PFM sensor
+  ui/                        OLED + MenuManager (Screen state machine)
+  storage/                   NVS persistence (nvs_store, config_repository)
+  system/                    WebServer/AP (stub)
+  comms/                     LoRa (stub)
 ```
+
+## Full documentation
+
+| File | Description |
+|---|---|
+| `docs/RECAP.md` | Complete implementation history |
+| `docs/TECHNICAL_SPEC.md` | Full spec for recreating the project from scratch |
+| `docs/ARCHITECTURE.md` | Architecture overview |
+| `docs/INDEX.md` | Document index |
+| `CHANGELOG.md` | Version changelog |
 
 ## Platform abstraction
 
-`main/platform/platform_bootstrap.h/.cpp` wraps the Heltec board API so application code never depends on `heltec_unofficial.h` directly. Available through `pulse::platform::`:
+`pulse::platform::` wraps Heltec board API (see `platform_bootstrap.h`):
 
 | Category | Functions |
 |---|---|
-| Board lifecycle | `InitializeBoard()`, `PollBoard()` |
+| Board | `InitializeBoard()`, `PollBoard()` |
 | LED | `BlinkConfirmationLed()` |
 | Button | `IsButtonPressed()`, `ConsumeButtonSingleClick()`, `ConsumeButtonLongPress(ms)` |
 | OLED | `DisplayClear()`, `DisplaySetFontNormal()`, `DisplaySetFontLarge()`, `DisplayDrawText()`, `DisplayMeasureTextWidth()`, `DisplayDrawImage()`, `DisplayDrawPageImage()`, `DisplayPresent()` |
@@ -79,32 +255,16 @@ main/
 
 ## SDK config
 
-`idf.py menuconfig` changes go into `sdkconfig` (gitignored). To persist a change:
+`idf.py menuconfig` → `sdkconfig` (gitignored). Persist with `idf.py save-defconfig` → updates `sdkconfig.defaults` (tracked).
 
-```batch
-idf.py save-defconfig
-```
+Defaults: 8MB flash DIO 80MHz, custom partition (factory + 2 OTA), Arduino framework, FreeRTOS tick 1000 Hz.
 
-This updates `sdkconfig.defaults` (tracked). Current defaults: 8MB flash (DIO 80MHz), custom partition table (factory + 2 OTA), Arduino framework enabled, ESP32-S3 cache defaults.
+## Components
 
-## Components overview
-
-| Component | Source | Purpose |
-|---|---|---|
-| `heltec_esp32_lora_v3` | Heltec official | Board support: `heltec_unofficial.h`, `radio`, `display`, `button` globals |
-| `arduino` | esp32-arduino | Arduino framework (`setup()`/`loop()`, `String`, `Serial`, etc.) |
-| `RadioLib` | jgromes/RadioLib | SX1262 driver |
-| `esp8266-oled-ssd1306` | ThingPulse/oled-ssd1306 | OLED display via I2C |
-| `HotButton` | Heltec convenience | Debounced button state machine |
-
-## Starting a new project
-
-1. Copy this entire directory
-2. Update `CMakeLists.txt` project name
-3. Edit `main/main.cpp` — add your `setup()` / `loop()` logic
-4. Add new source files to `main/CMakeLists.txt`
-5. Use `pulse::platform::*` for board I/O (OLED, button, LoRa radio)
-
-## OTA
-
-Partition table reserves factory + 2 OTA slots (0x290000 each) on 8MB flash. For OTA updates, use `esp_https_ota` or `esp_ota_ops` (the `app_update` component is already pulled in by the toolchain).
+| Component | Purpose |
+|---|---|
+| `heltec_esp32_lora_v3` | Board: OLED, button, LED, SX1262 |
+| `arduino` | Arduino framework |
+| `RadioLib` | SX1262 driver |
+| `esp8266-oled-ssd1306` | OLED via I2C |
+| `HotButton` | Debounced button |
