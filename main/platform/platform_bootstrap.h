@@ -15,9 +15,12 @@ bool ConsumeButtonLongPress(uint32_t durationMs);
 bool IsButtonPressed();
 
 void DisplayClear();
+void DisplaySetFontNormal();
+void DisplaySetFontLarge();
 void DisplayDrawText(int16_t x, int16_t y, const char* text);
 int16_t DisplayMeasureTextWidth(const char* text);
 void DisplayDrawImage(int16_t x, int16_t y, int16_t width, int16_t height, const uint8_t* image);
+void DisplayDrawPageImage(int16_t x, int16_t y, int16_t width, int16_t height, const uint8_t* image);
 void DisplayPresent();
 
 int InitializeRadio();

@@ -70,8 +70,8 @@ main/
 | Board lifecycle | `InitializeBoard()`, `PollBoard()` |
 | LED | `BlinkConfirmationLed()` |
 | Button | `IsButtonPressed()`, `ConsumeButtonSingleClick()`, `ConsumeButtonLongPress(ms)` |
-| OLED | `DisplayClear()`, `DisplayDrawText()`, `DisplayMeasureTextWidth()`, `DisplayDrawImage()`, `DisplayPresent()` |
-| LoRa radio | `InitializeRadio()`, `ConfigureRadio(freq,bw,sf,power)`, `SetRadioReceiveAction()`, `StartRadioReceive()`, `TransmitRadio()`, `ReadRadioData()`, `GetRadioRssi()`, `GetRadioSnr()` |
+| OLED | `DisplayClear()`, `DisplaySetFontNormal()`, `DisplaySetFontLarge()`, `DisplayDrawText()`, `DisplayMeasureTextWidth()`, `DisplayDrawImage()`, `DisplayDrawPageImage()`, `DisplayPresent()` |
+| LoRa radio | `InitializeRadio()`, `ConfigureRadio(freq,bw,sf,power)`, `SetRadioReceiveAction()`, `ClearRadioReceiveAction()`, `StartRadioReceive()`, `TransmitRadio()`, `ReadRadioData()`, `GetRadioRssi()`, `GetRadioSnr()` |
 
 ## Entry point
 

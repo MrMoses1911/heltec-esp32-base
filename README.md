@@ -60,8 +60,8 @@ O código de aplicação nunca chama `heltec_unofficial.h` diretamente. Tudo pas
 | Placa | `InitializeBoard()`, `PollBoard()` |
 | LED | `BlinkConfirmationLed()` |
 | Botão | `IsButtonPressed()`, `ConsumeButtonSingleClick()`, `ConsumeButtonLongPress(ms)` |
-| OLED | `DisplayClear()`, `DisplayDrawText()`, `DisplayMeasureTextWidth()`, `DisplayDrawImage()`, `DisplayPresent()` |
-| LoRa | `InitializeRadio()`, `ConfigureRadio(freq,bw,sf,power)`, `SetRadioReceiveAction()`, `StartRadioReceive()`, `TransmitRadio()`, `ReadRadioData()`, `GetRadioRssi()`, `GetRadioSnr()` |
+| OLED | `DisplayClear()`, `DisplaySetFontNormal()`, `DisplaySetFontLarge()`, `DisplayDrawText()`, `DisplayMeasureTextWidth()`, `DisplayDrawImage()`, `DisplayDrawPageImage()`, `DisplayPresent()` |
+| LoRa | `InitializeRadio()`, `ConfigureRadio(freq,bw,sf,power)`, `SetRadioReceiveAction()`, `ClearRadioReceiveAction()`, `StartRadioReceive()`, `TransmitRadio()`, `ReadRadioData()`, `GetRadioRssi()`, `GetRadioSnr()` |
 
 ## Como criar um novo projeto
 
@@ -71,22 +71,9 @@ O código de aplicação nunca chama `heltec_unofficial.h` diretamente. Tudo pas
 4. Escreva sua lógica em `main/main.cpp` (setup/loop)
 5. Use `pulse::platform::*` para acessar a placa
 
-```cpp
-void setup() {
-  Serial.begin(115200);
-  pulse::platform::InitializeBoard();
+O `main/main.cpp` já vem como smoke-test funcional: inicializa OLED, configura o SX1262 em RX contínuo, mostra status no display, pisca o LED no click simples e reinicia o rádio com long press de 2s.
 
-  // Inicializa rádio
-  pulse::platform::InitializeRadio();
-  pulse::platform::ConfigureRadio(915.0, 500.0, 9, 10);
-  pulse::platform::StartRadioReceive();
-}
-
-void loop() {
-  pulse::platform::PollBoard();
-  delay(10);
-}
-```
+Para iniciar uma aplicação real, mantenha `pulse::platform::InitializeBoard()` no `setup()`, chame `pulse::platform::PollBoard()` no `loop()` e substitua o restante pela lógica do seu produto.
 
 ## Configurações (sdkconfig)
 
