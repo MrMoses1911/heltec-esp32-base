@@ -12,6 +12,26 @@ Baseado na arquitetura do Pulse SafeDock, removendo a lógica de aplicação e m
 
 Este repositório vive no WSL, mas os comandos IDF executam no Windows porque as ferramentas são Windows-native.
 
+## Criando um Novo Projeto
+
+Este repositório é um **template do GitHub**. O projeto novo deve nascer a partir do template — **nunca** faça `git clone` do link do template para trabalhar nele: o `origin` apontará para `heltec-esp32-base` e o `git push` sobrescreverá o template.
+
+**Fluxo gh (Windows ou WSL):**
+
+```bat
+:: cmd/PowerShell no Windows
+gh repo create <nome-do-projeto> --template MrMoses1911/heltec-esp32-base --private --clone
+cd <nome-do-projeto>
+```
+
+O `--clone` já clona o projeto novo, que nasce com histórico e remote próprios — o push vai apenas para o repo novo.
+
+**Fluxo web:**
+
+1. Abra https://github.com/MrMoses1911/heltec-esp32-base
+2. Clique em **Use this template** → *Create a new repository*
+3. Clone o repo **novo** (o link dele, não o do template)
+
 ## Quick Start
 
 ```batch
