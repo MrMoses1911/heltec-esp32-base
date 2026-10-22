@@ -2,8 +2,6 @@
 
 Template limpo para projetos com **Heltec WiFi LoRa V3** (ESP32-S3 + SX1262) no **ESP-IDF 5.5.3** com framework **Arduino**.
 
-Baseado na arquitetura do Pulse SafeDock, removendo a lógica de aplicação e mantendo o esqueleto reutilizável: inicialização da placa, display OLED, botão, LED e rádio LoRa.
-
 ## Requisitos
 
 - ESP-IDF 5.5.3 instalado (`C:\esp\v5.5.3\esp-idf`)
